@@ -27,7 +27,7 @@ public class BoneSphere : MonoBehaviour
     {
         Softbody.Init(Shape, ColliderSize, RigidbodyMass, Spring, Damper, RigidbodyConstraints.FreezeRotation, PrefabLine, ViewLines);
 
-        Softbody.AddCollider(ref root, Softbody.ColliderShape.Sphere, 0.005f, 10f);
+        Softbody.AddCollider(ref root, Softbody.ColliderShape.Sphere, 0.005f, 6f);
         Softbody.AddCollider(ref x);
         Softbody.AddCollider(ref x2);
         Softbody.AddCollider(ref y);
