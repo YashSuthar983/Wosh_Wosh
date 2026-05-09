@@ -205,10 +205,24 @@ MonoBehaviour:
   groundedStickVelocity: -2
   coyoteTime: 0.1
   jumpBufferTime: 0.12
+  stickyWallEnabled: 1
+  stickyMaterial: 4
+  stickyWallMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  requireStickyWallMarker: 1
+  stickyWallMaxNormalY: 0.35
+  stickyWallContactMemory: 0.18
+  stickyWallSlideSpeed: 0.15
+  stickyWallGripAcceleration: 30
+  wallJumpUpSpeed: 6.5
+  wallJumpAwaySpeed: 4.8
+  wallJumpLockout: 0.12
   impactPushEnabled: 1
   impactPushMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  requireImpactObject: 1
   minRunImpactSpeed: 2.4
   minAirImpactSpeed: 1.4
   baseImpactImpulse: 4
@@ -296,7 +310,6 @@ MonoBehaviour:
   mergeAddsPressureBonus: 0
   absorbAddsPressureBonus: 0
   mergeKeyAbsorbsNearbySlime: 1
-  mergeKeyMergesAllSplitPieces: 1
   manualAbsorbRadius: 1.4
   manualAbsorbMask:
     serializedVersion: 2

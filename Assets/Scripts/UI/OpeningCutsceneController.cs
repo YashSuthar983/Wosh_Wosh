@@ -14,7 +14,7 @@ namespace Heartwell.UI
     {
         [Header("Assets")]
         [SerializeField] private List<Sprite> slides;
-        [SerializeField] private string targetNextScene = "OutdoorsScene";
+        [SerializeField] private string targetNextScene = "mosswake";
 
         [Header("Components")]
         [SerializeField] private Image displayImage;
