@@ -22,7 +22,7 @@ namespace Heartwell.UI
 
         [Header("Timing")]
         [SerializeField] private float fadeDuration = 0.5f;
-        [SerializeField] private float displayDuration = 5.0f;
+        [SerializeField] private float displayDuration = 4.0f;
         [SerializeField] private float movementScale = 1.1f;
 
         private int currentSlideIndex = 0;
