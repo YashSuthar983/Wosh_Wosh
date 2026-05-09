@@ -68,7 +68,6 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private bool mergeAddsPressureBonus = false;
     [SerializeField] private bool absorbAddsPressureBonus = false;
     [SerializeField] private bool mergeKeyAbsorbsNearbySlime = true;
-    [SerializeField] private bool mergeKeyMergesAllSplitPieces = true;
     [SerializeField] private float manualAbsorbRadius = 1.4f;
     [SerializeField] private LayerMask manualAbsorbMask = ~0;
 
@@ -1002,13 +1001,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         {
             if (splitPieces.Count > 0)
             {
-                if (mergeKeyMergesAllSplitPieces)
-                {
-                    isSplit = false;
-                    MergeSplitPieces();
-                    RefreshShapeTarget();
-                }
-                else if (MergeNearbySplitPieces() == 0)
+                if (MergeNearbySplitPieces() == 0)
                 {
                     TryAbsorbNearbySlime(GetBodyCenterPosition());
                 }

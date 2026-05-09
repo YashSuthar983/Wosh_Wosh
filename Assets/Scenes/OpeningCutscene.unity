@@ -747,7 +747,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 98a53acd5ebd484d399f6506e8c55c4c, type: 3}
   - {fileID: 21300000, guid: d81247205d98dd0fcba66972ca36959c, type: 3}
   - {fileID: 21300000, guid: 34b428a67e4fd067091b852e4baee10e, type: 3}
-  targetNextScene: MainMenu
+  targetNextScene: mosswake
   displayImage: {fileID: 1305734960}
   canvasGroup: {fileID: 1305734956}
   fadeDuration: 0.5

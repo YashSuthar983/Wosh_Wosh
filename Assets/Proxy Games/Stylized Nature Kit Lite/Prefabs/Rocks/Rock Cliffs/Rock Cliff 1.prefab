@@ -260,6 +260,7 @@ GameObject:
   - component: {fileID: 2283974389285834601}
   - component: {fileID: 643664980826971428}
   - component: {fileID: 1512499266873717305}
+  - component: {fileID: 592350766332791511}
   m_Layer: 0
   m_Name: Rock Cliff 1
   m_TagString: Untagged
@@ -336,9 +337,27 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 7108327359033116438, guid: 0d471cc3db39dc847803964edbb2f4b4, type: 3}
+--- !u!114 &592350766332791511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5353588270218422151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a9e4b89caa8e4f0d8d0e3b7211d8a6f2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  canStick: 1
+  canWallJump: 1
+  gripMultiplier: 1
+  slideSpeedMultiplier: 6.96
+  wallJumpUpMultiplier: 0.4
+  wallJumpAwayMultiplier: 1.17
 --- !u!1 &6882989035643432841
 GameObject:
   m_ObjectHideFlags: 0

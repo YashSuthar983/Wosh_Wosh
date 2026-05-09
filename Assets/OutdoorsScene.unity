@@ -1830,7 +1830,6 @@ MonoBehaviour:
   mergeAddsPressureBonus: 0
   absorbAddsPressureBonus: 0
   mergeKeyAbsorbsNearbySlime: 1
-  mergeKeyMergesAllSplitPieces: 1
   manualAbsorbRadius: 1.4
   manualAbsorbMask:
     serializedVersion: 2
