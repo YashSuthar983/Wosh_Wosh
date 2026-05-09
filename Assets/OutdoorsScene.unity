@@ -1291,7 +1291,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   bodyRoot: {fileID: 0}
   slimeRenderer: {fileID: 0}
-  slimeMaterialOverride: {fileID: 2100000, guid: d91da4d5b29574937b1f9d50e40eec89,
+  slimeMaterialOverride: {fileID: 2100000, guid: 39c97a641206a724091f459d9958c7dc,
     type: 2}
   bodyRigidbody: {fileID: 0}
   splitPiecePrefab: {fileID: 4838354347015398771, guid: b4a750580e16e66f6bed5cfad8bf0ff8,
