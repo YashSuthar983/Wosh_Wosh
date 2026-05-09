@@ -4,12 +4,59 @@ using UnityEngine.UI;
 using TMPro;
 using Heartwell.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 namespace Heartwell.Editor
 {
     public class HeartwellAutomation : EditorWindow
     {
-        [MenuItem("Heartwell/Atmospheric Overhaul (Fix Layout & Background)")]
+        [MenuItem("Heartwell/1. Finalize Entire Project")]
+        public static void FinalizeProject()
+        {
+            // 1. Setup Opening Cutscene
+            // This creates OpeningCutscene.unity, sets it up, and saves it.
+            OpeningCutsceneSetup.Setup();
+
+            // 2. Setup Main Menu
+            // We need to open or create MainMenu.unity before running AtmosphericOverhaul
+            string mainMenuPath = "Assets/Scenes/MainMenu.unity";
+            Scene mainMenuScene;
+            if (System.IO.File.Exists(mainMenuPath))
+            {
+                mainMenuScene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(mainMenuPath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+            }
+            else
+            {
+                mainMenuScene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.DefaultGameObjects, UnityEditor.SceneManagement.NewSceneMode.Single);
+            }
+
+            AtmosphericOverhaul();
+            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(mainMenuScene, mainMenuPath);
+
+            // 3. Fix Build Settings
+            // 0: MainMenu, 1: OpeningCutscene, 2: OutdoorsScene
+            string[] requiredScenes = { "Assets/Scenes/MainMenu.unity", "Assets/Scenes/OpeningCutscene.unity", "Assets/OutdoorsScene.unity" };
+            List<EditorBuildSettingsScene> buildScenes = new List<EditorBuildSettingsScene>();
+            foreach (string scenePath in requiredScenes)
+            {
+                if (System.IO.File.Exists(scenePath))
+                {
+                    buildScenes.Add(new EditorBuildSettingsScene(scenePath, true));
+                }
+            }
+            EditorBuildSettings.scenes = buildScenes.ToArray();
+
+            Debug.Log("=========================================");
+            Debug.Log("PROJECT FINALIZATION COMPLETE!");
+            Debug.Log("1. Opening Cutscene Created");
+            Debug.Log("2. Main Menu Overhauled");
+            Debug.Log("3. Build Settings Ordered");
+            Debug.Log("You are now in the Main Menu scene. Press Play to test!");
+            Debug.Log("=========================================");
+        }
+
+        [MenuItem("Heartwell/2. Atmospheric Overhaul (Fix Layout & Background)")]
         public static void AtmosphericOverhaul()
         {
             // PRE-FLIGHT CHECK: Load assets
@@ -53,52 +100,19 @@ namespace Heartwell.Editor
             vlg.childForceExpandHeight = false;
             
             var rootRect = buttonRoot.GetComponent<RectTransform>();
-            rootRect.anchorMin = new Vector2(0.82f, 0.38f); 
-            rootRect.anchorMax = new Vector2(0.82f, 0.38f);
+            rootRect.anchorMin = new Vector2(0.5f, 0.2f); 
+            rootRect.anchorMax = new Vector2(0.5f, 0.2f);
             rootRect.pivot = new Vector2(0.5f, 0.5f);
             rootRect.anchoredPosition = Vector2.zero; 
             rootRect.sizeDelta = new Vector2(600, 800);
             
             vlg.childAlignment = TextAnchor.MiddleCenter;
             vlg.spacing = 20; 
-            buttonRoot.AddComponent<UIMouseParallax>().amount = 15f;
 
             var ctrl = manager.GetComponent<MainMenuController>();
             CreatePolishedButton("Btn_Embark", buttonRoot.transform, ctrl.Embark, playBtn);
             CreatePolishedButton("Btn_Options", buttonRoot.transform, ctrl.OpenOptions, optBtn);
             CreatePolishedButton("Btn_Exit", buttonRoot.transform, ctrl.QuitGame, exitBtn);
-
-            // 8. SLIME CHARACTER SETUP
-            GameObject slimeContainer = new GameObject("Slime_Diorama");
-            slimeContainer.transform.SetParent(uiRoot.transform, false);
-            var slimeContRect = slimeContainer.AddComponent<RectTransform>();
-            slimeContRect.anchorMin = new Vector2(0.2f, 0.2f); // Bottom Left
-            slimeContRect.anchorMax = new Vector2(0.2f, 0.2f);
-            slimeContRect.pivot = new Vector2(0.5f, 0.5f);
-            slimeContRect.anchoredPosition = Vector2.zero;
-            slimeContRect.sizeDelta = new Vector2(600, 600);
-            
-            GameObject slimeObj = new GameObject("Slime_Sprite");
-            slimeObj.transform.SetParent(slimeContainer.transform, false);
-            var slimeImg = slimeObj.AddComponent<Image>();
-            Sprite slimeSprite = FindSpriteByName("slime");
-            if (slimeSprite != null) 
-            {
-                slimeImg.sprite = slimeSprite;
-                slimeImg.SetNativeSize();
-            }
-            else
-            {
-                // Make it completely invisible if missing, rather than a white square
-                slimeImg.color = Color.clear;
-            }
-            slimeImg.raycastTarget = false;
-            
-            var slimeRect = slimeObj.GetComponent<RectTransform>();
-            slimeRect.localScale = new Vector3(0.8f, 0.8f, 1f);
-            
-            slimeObj.AddComponent<MenuSlimeIdle>(); 
-            slimeContainer.AddComponent<UIMouseParallax>().amount = 30f;
 
             // 9. Setup Cursor
             SlimeCursorSetup.SetupCursor();
@@ -119,8 +133,16 @@ namespace Heartwell.Editor
             bgObj.transform.SetAsFirstSibling();
             
             var bgImg = bgObj.AddComponent<Image>();
-            if (bg != null) bgImg.sprite = bg;
-            bgImg.color = Color.white;
+            if (bg != null) 
+            {
+                bgImg.sprite = bg;
+                bgImg.color = Color.white;
+            }
+            else
+            {
+                bgImg.color = Color.magenta;
+            }
+            
             bgImg.raycastTarget = false;
             
             var bgRect = bgObj.GetComponent<RectTransform>();
@@ -128,9 +150,9 @@ namespace Heartwell.Editor
             bgRect.anchorMax = Vector2.one;
             bgRect.pivot = new Vector2(0.5f, 0.5f);
             bgRect.anchoredPosition = Vector2.zero;
-            bgRect.sizeDelta = new Vector2(100, 100); // Overhang by 50px on all sides to prevent parallax clipping
+            bgRect.sizeDelta = Vector2.zero;
             
-            bgObj.AddComponent<UIMouseParallax>().amount = 20f;
+            bgRect.localScale = Vector3.one; // No scaling!
         }
 
         private static void DestroyOldObjects()
@@ -155,9 +177,11 @@ namespace Heartwell.Editor
 
         private static Sprite FindSpriteByName(string namePart)
         {
+            AssetDatabase.Refresh();
+
             string fileName = "";
             string lower = namePart.ToLower();
-            if (lower.Contains("background")) fileName = "background.png";
+            if (lower.Contains("background")) fileName = "New_Background.png";
             else if (lower.Contains("logo")) fileName = "heartwell_logo.png";
             else if (lower.Contains("slime")) fileName = "heartwell_slime.png";
             else if (lower.Contains("start") || lower.Contains("play")) fileName = "start.png";
@@ -175,6 +199,7 @@ namespace Heartwell.Editor
             {
                 bool needsReimport = false;
                 if (importer.textureType != TextureImporterType.Sprite) { importer.textureType = TextureImporterType.Sprite; needsReimport = true; }
+                if (importer.spriteImportMode != SpriteImportMode.Single) { importer.spriteImportMode = SpriteImportMode.Single; needsReimport = true; }
                 if (importer.alphaIsTransparency == false) { importer.alphaIsTransparency = true; needsReimport = true; }
                 
                 if (needsReimport)
@@ -183,7 +208,22 @@ namespace Heartwell.Editor
                 }
             }
 
-            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(path);
+            foreach (var asset in allAssets)
+            {
+                if (asset is Sprite s) return s;
+            }
+
+            // FALLBACK: If Unity's importer is completely broken, just read the raw texture and generate a Sprite manually!
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (tex != null)
+            {
+                Debug.Log($"HEARTWELL: Importer failed, but recovered texture {fileName}! Generating Sprite manually.");
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            }
+            
+            Debug.LogError($"HEARTWELL: Failed to load Sprite at {path} entirely!");
+            return null;
         }
 
         private static void CreatePolishedButton(string name, Transform parent, UnityEngine.Events.UnityAction action, Sprite sprite)
@@ -199,7 +239,7 @@ namespace Heartwell.Editor
             img.preserveAspect = true;
 
             Button btn = btnObj.AddComponent<Button>();
-            btn.onClick.AddListener(action);
+            UnityEditor.Events.UnityEventTools.AddPersistentListener(btn.onClick, action);
             btnObj.AddComponent<SquishButton>();
         }
     }

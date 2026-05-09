@@ -10,14 +10,40 @@ namespace Heartwell.UI
     public class MainMenuController : MonoBehaviour
     {
         [Header("Scene Settings")]
-        [SerializeField] private string firstLevelSceneName = "OutdoorsScene";
+        [SerializeField] private string firstLevelSceneName = "OpeningCutscene";
+
+        private void Start()
+        {
+            // Auto-wire buttons at runtime to avoid Unity Editor persistent listener serialization issues
+            var playBtnObj = GameObject.Find("Btn_Embark");
+            if (playBtnObj != null)
+            {
+                var btn = playBtnObj.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.onClick.AddListener(Embark);
+            }
+
+            var optBtnObj = GameObject.Find("Btn_Options");
+            if (optBtnObj != null)
+            {
+                var btn = optBtnObj.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.onClick.AddListener(OpenOptions);
+            }
+
+            var exitBtnObj = GameObject.Find("Btn_Exit");
+            if (exitBtnObj != null)
+            {
+                var btn = exitBtnObj.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.onClick.AddListener(QuitGame);
+            }
+        }
         
         /// <summary>
         /// Starts the journey by loading the first gameplay level.
         /// </summary>
         public void Embark()
         {
-            // TODO: Add transition/fading logic here
+            Debug.Log($"Embark button clicked! Attempting to load scene: {firstLevelSceneName}");
+            Time.timeScale = 1f; // Ensure time isn't frozen, which would break the cutscene coroutines
             SceneManager.LoadScene(firstLevelSceneName);
         }
 

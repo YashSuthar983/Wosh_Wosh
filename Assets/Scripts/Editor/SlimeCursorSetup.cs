@@ -23,7 +23,7 @@ namespace Heartwell.Editor
             canvas.sortingOrder = 9999; // EXTREME TOP
             
             root.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            root.AddComponent<GraphicRaycaster>();
+            // Removed GraphicRaycaster so the cursor layer never blocks clicks!
 
             // 3. Create Cursor
             GameObject cursorObj = new GameObject("Slime_Cursor");
@@ -34,70 +34,80 @@ namespace Heartwell.Editor
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(64, 64);
+            rect.sizeDelta = new Vector2(32, 32);
             cursorObj.transform.localScale = Vector3.one;
 
             Image img = cursorObj.AddComponent<Image>();
             img.raycastTarget = false; 
 
             // 4. Asset Import & Slicing
-            string spritePath = "Assets/Art/momo_slime.png";
+            string spritePath = "Assets/Art/UI/cursor_transparent.png";
+            
+            // Force import first
+            AssetDatabase.ImportAsset(spritePath, ImportAssetOptions.ForceUpdate);
+            
             TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
             if (importer != null)
             {
                 importer.textureType = TextureImporterType.Sprite;
                 importer.spriteImportMode = SpriteImportMode.Multiple;
-                importer.filterMode = FilterMode.Point; // Pixel art style
+                importer.filterMode = FilterMode.Bilinear; // AI generated art is usually high res, not pixel art
                 importer.textureCompression = TextureImporterCompression.Uncompressed;
-
-                // Slice into 64x64 grid (5x3)
-                var metaData = new System.Collections.Generic.List<SpriteMetaData>();
-                for (int y = 0; y < 3; y++)
+                importer.isReadable = true; // Required for automatic slicing
+                
+                importer.SaveAndReimport();
+                
+                Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(spritePath);
+                if (tex != null)
                 {
-                    for (int x = 0; x < 5; x++)
+                    Rect[] rects = UnityEditorInternal.InternalSpriteUtility.GenerateAutomaticSpriteRectangles(tex, 10, 0);
+                    var metaData = new System.Collections.Generic.List<SpriteMetaData>();
+                    
+                    for (int i = 0; i < rects.Length; i++)
                     {
                         var meta = new SpriteMetaData();
-                        meta.rect = new Rect(x * 64, (2 - y) * 64, 64, 64); // Unity Y is bottom-up
-                        meta.name = $"momo_{y}_{x}";
-                        meta.alignment = (int)SpriteAlignment.Center;
+                        meta.rect = rects[i];
+                        meta.name = "cursor_" + i;
+                        meta.alignment = 9; // Custom pivot
+                        meta.pivot = new Vector2(0.5f, 0.5f);
                         metaData.Add(meta);
                     }
+                    
+                    importer.spritesheet = metaData.ToArray();
+                    EditorUtility.SetDirty(importer);
+                    importer.SaveAndReimport();
                 }
-                importer.spritesheet = metaData.ToArray();
-                importer.SaveAndReimport();
             }
 
-            // 5. Add Script & Assign Animation
-            var cursorScript = cursorObj.AddComponent<SlimeCursor>();
-            
-            // Force save and refresh to ensure slices are created
+            // Force Unity to acknowledge the newly sliced sprites before we try to load them!
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            // 6. Assign Animation Frames
-            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(spritePath);
-            Debug.Log($"HEARTWELL: Found {assets.Length} assets at {spritePath}");
-            var frames = new System.Collections.Generic.List<Sprite>();
-            foreach (var asset in assets)
-            {
-                if (asset is Sprite s) frames.Add(s);
-            }
+            // 5. Add Script & Assign Animation
+            SlimeCursor cursor = cursorObj.AddComponent<SlimeCursor>();
+            
+            // Assign frames dynamically from imported asset
+            Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(spritePath);
+            var allFrames = new System.Collections.Generic.List<Sprite>();
 
-            if (frames.Count > 0)
+            foreach (var asset in allAssets)
             {
-                img.sprite = frames[0];
-                img.color = Color.white;
-                
-                var allFrames = frames.ToArray();
+                if (asset is Sprite s)
+                {
+                    allFrames.Add(s);
+                }
+            }
+            
+            if (allFrames.Count > 0)
+            {
+                var framesArray = allFrames.ToArray();
                 var field = typeof(SlimeCursor).GetField("animationFrames", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                if (field != null) field.SetValue(cursorScript, allFrames);
+                if (field != null) field.SetValue(cursor, framesArray);
             }
-            else
-            {
-                Debug.LogError("HEARTWELL: NO SPRITE SLICES FOUND! Check momo_slime.png import settings.");
-            }
-
-            Debug.Log("HEARTWELL: Slime Cursor Setup Complete with GOO TRAIL!");
+            
+            EditorUtility.SetDirty(cursorObj);
+            
+            Debug.Log("HEARTWELL: Slime Cursor Setup Complete!");
         }
     }
 }

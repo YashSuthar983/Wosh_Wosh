@@ -160,7 +160,7 @@ namespace Heartwell.UI
             
             droplet.Initialize(
                 s, 
-                new Color(1f, 0.6f, 0.85f, 0.8f), 
+                new Color(0.3f, 0.9f, 0.2f, 0.8f), // Bright slime green
                 Random.Range(15f, 35f), 
                 _velocity * -0.1f // Slight pushback
             );
