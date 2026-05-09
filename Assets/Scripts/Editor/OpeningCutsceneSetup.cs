@@ -12,7 +12,7 @@ namespace Heartwell.Editor
     public class OpeningCutsceneSetup : EditorWindow
     {
         private const string ScenePath = "Assets/Scenes/OpeningCutscene.unity";
-        private const string NextSceneDefault = "MainMenu";
+        private const string NextSceneDefault = "OutdoorsScene";
         private const string ArtPath = "Assets/Art/Opening";
 
         [MenuItem("Heartwell/Setup Opening Cutscene")]
@@ -182,7 +182,7 @@ namespace Heartwell.Editor
 
             if (!alreadyExists)
             {
-                scenes.Insert(0, new EditorBuildSettingsScene(path, true));
+                scenes.Add(new EditorBuildSettingsScene(path, true));
                 EditorBuildSettings.scenes = scenes.ToArray();
             }
         }
