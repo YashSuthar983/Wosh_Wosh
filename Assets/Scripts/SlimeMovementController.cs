@@ -48,9 +48,23 @@ public class SlimeMovementController : MonoBehaviour
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBufferTime = 0.12f;
 
+    [Header("Sticky Wall")]
+    [SerializeField] private bool stickyWallEnabled = true;
+    [SerializeField] private SlimeMaterialType stickyMaterial = SlimeMaterialType.Sticky;
+    [SerializeField] private LayerMask stickyWallMask = ~0;
+    [SerializeField] private bool requireStickyWallMarker = true;
+    [SerializeField, Range(0f, 1f)] private float stickyWallMaxNormalY = 0.35f;
+    [SerializeField] private float stickyWallContactMemory = 0.18f;
+    [SerializeField] private float stickyWallSlideSpeed = 0.15f;
+    [SerializeField] private float stickyWallGripAcceleration = 30f;
+    [SerializeField] private float wallJumpUpSpeed = 6.5f;
+    [SerializeField] private float wallJumpAwaySpeed = 4.8f;
+    [SerializeField] private float wallJumpLockout = 0.12f;
+
     [Header("Impact Push")]
     [SerializeField] private bool impactPushEnabled = true;
     [SerializeField] private LayerMask impactPushMask = ~0;
+    [SerializeField] private bool requireImpactObject = true;
     [SerializeField] private float minRunImpactSpeed = 2.4f;
     [SerializeField] private float minAirImpactSpeed = 1.4f;
     [SerializeField] private float baseImpactImpulse = 4f;
@@ -86,14 +100,20 @@ public class SlimeMovementController : MonoBehaviour
     private Vector2 moveInput;
     private float lastGroundedTime = -100f;
     private float jumpQueuedTime = -100f;
+    private float lastStickyWallContactTime = -100f;
+    private float lastWallJumpTime = -100f;
+    private Vector3 stickyWallNormal = Vector3.zero;
+    private SlimeStickyWall activeStickyWall;
     private bool jumpQueued;
     private bool grounded;
+    private bool stickyWallActive;
     private bool warnedMissingRigidbody;
     private int softbodyBodyCount;
 
     public Vector2 MoveInput => moveInput;
     public Vector3 Velocity => driveRigidbody != null ? driveRigidbody.velocity : Vector3.zero;
     public bool IsGrounded => grounded;
+    public bool IsStickyWallActive => stickyWallActive;
 
     private void OnCollisionEnter(Collision collision)
     {
@@ -138,6 +158,7 @@ public class SlimeMovementController : MonoBehaviour
             return;
 
         UpdateGrounded();
+        stickyWallActive = HasActiveStickyWallContact() && !grounded;
 
         if (abilities != null && abilities.IsCrushed)
         {
@@ -156,7 +177,8 @@ public class SlimeMovementController : MonoBehaviour
 
         bool hasMoveInput = requestedMoveDirection.sqrMagnitude > 0.0001f;
         Vector3 moveDirection = ResolvePressureAwareMoveDirection(requestedMoveDirection);
-        MoveRigidbody(moveDirection, hasMoveInput);
+        MoveRigidbody(moveDirection, hasMoveInput, stickyWallActive);
+        ApplyStickyWallGrip();
 
         if (pressureAwareSqueeze)
             ApplySqueezeForces(requestedMoveDirection);
@@ -193,11 +215,14 @@ public class SlimeMovementController : MonoBehaviour
 
     public void HandleBodyPartImpact(Collision collision, Rigidbody sourceBody)
     {
+        RecordStickyWallContact(collision, sourceBody);
+
         if (!impactPushEnabled || collision == null || abilities == null || abilities.IsCrushed)
             return;
 
         Rigidbody targetBody = collision.rigidbody != null ? collision.rigidbody : (collision.collider != null ? collision.collider.attachedRigidbody : null);
-        if (!CanImpactPush(targetBody, collision.collider))
+        SlimeImpactObject impactObject = ResolveImpactObject(collision.collider, targetBody);
+        if (!CanImpactPush(targetBody, collision.collider, impactObject))
             return;
 
         float lastPushTime;
@@ -207,7 +232,7 @@ public class SlimeMovementController : MonoBehaviour
         Vector3 impactVelocity = ResolveImpactVelocity(sourceBody);
         Vector3 planarVelocity = Vector3.ProjectOnPlane(impactVelocity, Vector3.up);
         float impactSpeed = planarVelocity.magnitude;
-        float requiredSpeed = grounded ? minRunImpactSpeed : minAirImpactSpeed;
+        float requiredSpeed = impactObject != null ? impactObject.GetRequiredImpactSpeed(grounded) : (grounded ? minRunImpactSpeed : minAirImpactSpeed);
         if (impactSpeed < requiredSpeed)
             return;
 
@@ -219,19 +244,27 @@ public class SlimeMovementController : MonoBehaviour
             return;
 
         Vector3 contactPoint = collision.contactCount > 0 ? collision.GetContact(0).point : targetBody.worldCenterOfMass;
-        float impulse = CalculateImpactImpulse(impactSpeed, requiredSpeed, targetBody.mass);
-        Vector3 impulseVector = (pushDirection + Vector3.up * upwardImpulseFraction).normalized * impulse;
+        float impulse = CalculateImpactImpulse(impactSpeed, requiredSpeed, targetBody.mass, impactObject);
+        float upwardLift = impactObject != null ? impactObject.UpwardLift : upwardImpulseFraction;
+        Vector3 impulseVector = (pushDirection + Vector3.up * upwardLift).normalized * impulse;
 
         targetBody.AddForceAtPosition(impulseVector, contactPoint, ForceMode.Impulse);
         lastImpactPushTimes[targetBody] = Time.time;
 
-        if (selfRecoilVelocity > 0f && driveRigidbody != null)
-            AddVelocityChangeToDrivenBodies(-pushDirection * selfRecoilVelocity, true);
+        float recoilMultiplier = impactObject != null ? impactObject.SlimeRecoilMultiplier : 1f;
+        if (selfRecoilVelocity > 0f && recoilMultiplier > 0f && driveRigidbody != null)
+            AddVelocityChangeToDrivenBodies(-pushDirection * (selfRecoilVelocity * recoilMultiplier), true);
     }
 
-    private bool CanImpactPush(Rigidbody targetBody, Collider targetCollider)
+    private bool CanImpactPush(Rigidbody targetBody, Collider targetCollider, SlimeImpactObject impactObject)
     {
         if (targetBody == null || targetBody.isKinematic || targetCollider == null)
+            return false;
+
+        if (requireImpactObject && impactObject == null)
+            return false;
+
+        if (impactObject != null && !impactObject.CanMoveFromSlimeImpact)
             return false;
 
         if (IsOwnCollider(targetCollider) || targetBody == driveRigidbody)
@@ -246,6 +279,18 @@ public class SlimeMovementController : MonoBehaviour
         int colliderLayerMask = 1 << targetCollider.gameObject.layer;
         int bodyLayerMask = 1 << targetBody.gameObject.layer;
         return (impactPushMask.value & (colliderLayerMask | bodyLayerMask)) != 0;
+    }
+
+    private SlimeImpactObject ResolveImpactObject(Collider targetCollider, Rigidbody targetBody)
+    {
+        if (targetCollider != null)
+        {
+            SlimeImpactObject impactObject = targetCollider.GetComponentInParent<SlimeImpactObject>();
+            if (impactObject != null)
+                return impactObject;
+        }
+
+        return targetBody != null ? targetBody.GetComponentInParent<SlimeImpactObject>() : null;
     }
 
     private Vector3 ResolveImpactVelocity(Rigidbody sourceBody)
@@ -274,18 +319,27 @@ public class SlimeMovementController : MonoBehaviour
         return direction;
     }
 
-    private float CalculateImpactImpulse(float impactSpeed, float requiredSpeed, float targetMass)
+    private float CalculateImpactImpulse(float impactSpeed, float requiredSpeed, float targetMass, SlimeImpactObject impactObject)
     {
         float speedBonus = Mathf.Max(0f, impactSpeed - requiredSpeed) * impulsePerSpeed;
         float impulse = Mathf.Max(0f, baseImpactImpulse + speedBonus);
-        float volumeScale = abilities != null ? Mathf.Sqrt(Mathf.Max(0.25f, abilities.BodyVolume)) : 1f;
-        float massScale = Mathf.Pow(Mathf.Max(1f, targetMass), Mathf.Clamp01(massCompensation));
+        float volumeScale = impactObject == null || impactObject.ScaleWithSlimeVolume
+            ? (abilities != null ? Mathf.Sqrt(Mathf.Max(0.25f, abilities.BodyVolume)) : 1f)
+            : 1f;
+        float massScale = impactObject == null || impactObject.ScaleWithOwnMass
+            ? Mathf.Pow(Mathf.Max(1f, targetMass), Mathf.Clamp01(massCompensation))
+            : 1f;
 
         if (!grounded)
             impulse *= airborneImpactMultiplier;
 
         impulse *= volumeScale * Mathf.Lerp(1f, 0.65f, abilities != null ? abilities.CarryLoad01 : 0f);
-        return Mathf.Min(impulse, Mathf.Max(0f, maxImpactImpulse)) * massScale;
+        impulse *= massScale;
+
+        if (impactObject != null)
+            return impactObject.ModifyImpactImpulse(impulse);
+
+        return Mathf.Min(impulse, Mathf.Max(0f, maxImpactImpulse));
     }
 
     private Vector2 ReadWasdInput()
@@ -308,38 +362,75 @@ public class SlimeMovementController : MonoBehaviour
         return new Vector2(horizontal, vertical);
     }
 
-    private void MoveRigidbody(Vector3 moveDirection, bool hasMoveInput)
+    private void MoveRigidbody(Vector3 moveDirection, bool hasMoveInput, bool canWallJump)
     {
         Vector3 velocity = GetDrivenVelocity();
         Vector3 currentPlanarVelocity = new Vector3(velocity.x, 0f, velocity.z);
         float speed = moveSpeed * GetFormSpeedMultiplier();
-        float control = grounded ? acceleration : acceleration * airControl;
+        float control = grounded || canWallJump ? acceleration : acceleration * airControl;
         Vector3 targetPlanarVelocity = moveDirection * speed;
         Vector3 velocityDelta = targetPlanarVelocity - currentPlanarVelocity;
         Vector3 pushAcceleration = Vector3.ClampMagnitude(velocityDelta / Time.fixedDeltaTime, control);
-        bool jumped = ConsumeJumpIfReady();
+        Vector3 jumpVelocityChange;
+        bool jumped = ConsumeJumpIfReady(canWallJump, velocity, out jumpVelocityChange);
         bool includeWholeBody = hasMoveInput || driveWholeSoftbody;
 
         AddAccelerationToDrivenBodies(pushAcceleration, includeWholeBody);
 
         if (jumped)
-            AddVelocityChangeToDrivenBodies(Vector3.up * (jumpSpeed - velocity.y), includeWholeBody);
+            AddVelocityChangeToDrivenBodies(jumpVelocityChange, includeWholeBody);
         else if (grounded && velocity.y < groundedStickVelocity)
             AddVelocityChangeToDrivenBodies(Vector3.up * (groundedStickVelocity - velocity.y), false);
     }
 
-    private bool ConsumeJumpIfReady()
+    private bool ConsumeJumpIfReady(bool canWallJump, Vector3 velocity, out Vector3 velocityChange)
     {
+        velocityChange = Vector3.zero;
+
         if (jumpQueued && Time.time - jumpQueuedTime > jumpBufferTime)
             jumpQueued = false;
 
-        bool canUseBufferedJump = jumpQueued && Time.time - lastGroundedTime <= coyoteTime;
-        if (!canUseBufferedJump)
+        bool canUseGroundJump = jumpQueued && Time.time - lastGroundedTime <= coyoteTime;
+        bool canUseWallJump = jumpQueued
+            && canWallJump
+            && CanUseCurrentStickyWallJump()
+            && Time.time - lastStickyWallContactTime <= stickyWallContactMemory
+            && Time.time - lastWallJumpTime >= wallJumpLockout;
+
+        if (!canUseGroundJump && !canUseWallJump)
             return false;
 
         jumpQueued = false;
         grounded = false;
+
+        if (canUseWallJump && !canUseGroundJump)
+        {
+            lastWallJumpTime = Time.time;
+            stickyWallActive = false;
+            velocityChange = CalculateWallJumpVelocityChange(velocity);
+            return true;
+        }
+
+        velocityChange = Vector3.up * (jumpSpeed - velocity.y);
         return true;
+    }
+
+    private Vector3 CalculateWallJumpVelocityChange(Vector3 velocity)
+    {
+        Vector3 wallNormal = GetStickyWallHorizontalNormal();
+        if (wallNormal.sqrMagnitude <= 0.0001f)
+            wallNormal = Vector3.ProjectOnPlane(-ResolveMoveDirection(moveInput), Vector3.up).normalized;
+
+        if (wallNormal.sqrMagnitude <= 0.0001f)
+            wallNormal = Vector3.back;
+
+        Vector3 planarVelocity = Vector3.ProjectOnPlane(velocity, Vector3.up);
+        float currentAwaySpeed = Vector3.Dot(planarVelocity, wallNormal);
+        float targetAwaySpeed = wallJumpAwaySpeed * GetActiveStickyWallJumpAwayMultiplier();
+        float targetUpSpeed = wallJumpUpSpeed * GetActiveStickyWallJumpUpMultiplier();
+        Vector3 awayChange = wallNormal * Mathf.Max(0f, targetAwaySpeed - currentAwaySpeed);
+        Vector3 upChange = Vector3.up * (targetUpSpeed - velocity.y);
+        return awayChange + upChange;
     }
 
     private void UpdateGrounded()
@@ -369,6 +460,134 @@ public class SlimeMovementController : MonoBehaviour
         }
 
         return Vector3.ClampMagnitude(right * input.x + forward * input.y, 1f);
+    }
+
+    private void RecordStickyWallContact(Collision collision, Rigidbody sourceBody)
+    {
+        if (!stickyWallEnabled || collision == null || !IsStickySlime())
+            return;
+
+        Collider otherCollider = collision.collider;
+        if (otherCollider == null || IsOwnCollider(otherCollider) || !IsLayerInMask(otherCollider.gameObject.layer, stickyWallMask))
+            return;
+
+        SlimeStickyWall stickyWall = otherCollider.GetComponentInParent<SlimeStickyWall>();
+        if (!CanStickToWall(stickyWall))
+            return;
+
+        Vector3 sourceCenter = sourceBody != null
+            ? sourceBody.worldCenterOfMass
+            : (driveRigidbody != null ? driveRigidbody.worldCenterOfMass : transform.position);
+        Vector3 bestNormal = Vector3.zero;
+        float bestScore = 0f;
+
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint contact = collision.GetContact(i);
+            Vector3 normal = contact.normal;
+            Vector3 toSlime = sourceCenter - contact.point;
+
+            if (toSlime.sqrMagnitude > 0.0001f && Vector3.Dot(normal, toSlime) < 0f)
+                normal = -normal;
+
+            if (!IsStickyWallNormal(normal))
+                continue;
+
+            Vector3 horizontalNormal = Vector3.ProjectOnPlane(normal, Vector3.up);
+            float score = horizontalNormal.sqrMagnitude * (1f - Mathf.Abs(normal.y));
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestNormal = horizontalNormal.normalized;
+        }
+
+        if (bestNormal.sqrMagnitude <= 0.0001f)
+            return;
+
+        stickyWallNormal = bestNormal;
+        activeStickyWall = stickyWall;
+        lastStickyWallContactTime = Time.time;
+    }
+
+    private bool HasActiveStickyWallContact()
+    {
+        return stickyWallEnabled
+            && IsStickySlime()
+            && stickyWallNormal.sqrMagnitude > 0.0001f
+            && CanStickToWall(activeStickyWall)
+            && Time.time - lastStickyWallContactTime <= stickyWallContactMemory
+            && Time.time - lastWallJumpTime >= wallJumpLockout;
+    }
+
+    private bool CanStickToWall(SlimeStickyWall stickyWall)
+    {
+        if (requireStickyWallMarker && stickyWall == null)
+            return false;
+
+        return stickyWall == null || stickyWall.CanStick;
+    }
+
+    private bool CanUseCurrentStickyWallJump()
+    {
+        if (requireStickyWallMarker && activeStickyWall == null)
+            return false;
+
+        return activeStickyWall == null || activeStickyWall.CanWallJump;
+    }
+
+    private float GetActiveStickyWallGripMultiplier()
+    {
+        return activeStickyWall != null ? activeStickyWall.GripMultiplier : 1f;
+    }
+
+    private float GetActiveStickyWallSlideSpeedMultiplier()
+    {
+        return activeStickyWall != null ? activeStickyWall.SlideSpeedMultiplier : 1f;
+    }
+
+    private float GetActiveStickyWallJumpUpMultiplier()
+    {
+        return activeStickyWall != null ? activeStickyWall.WallJumpUpMultiplier : 1f;
+    }
+
+    private float GetActiveStickyWallJumpAwayMultiplier()
+    {
+        return activeStickyWall != null ? activeStickyWall.WallJumpAwayMultiplier : 1f;
+    }
+
+    private bool IsStickySlime()
+    {
+        return abilities != null && abilities.CurrentMaterial == stickyMaterial;
+    }
+
+    private bool IsStickyWallNormal(Vector3 normal)
+    {
+        Vector3 horizontalNormal = Vector3.ProjectOnPlane(normal, Vector3.up);
+        return horizontalNormal.sqrMagnitude > 0.25f && Mathf.Abs(normal.y) <= stickyWallMaxNormalY;
+    }
+
+    private Vector3 GetStickyWallHorizontalNormal()
+    {
+        Vector3 horizontalNormal = Vector3.ProjectOnPlane(stickyWallNormal, Vector3.up);
+        return horizontalNormal.sqrMagnitude > 0.0001f ? horizontalNormal.normalized : Vector3.zero;
+    }
+
+    private void ApplyStickyWallGrip()
+    {
+        if (!stickyWallActive || driveRigidbody == null)
+            return;
+
+        Vector3 wallNormal = GetStickyWallHorizontalNormal();
+        if (wallNormal.sqrMagnitude <= 0.0001f)
+            return;
+
+        AddAccelerationToDrivenBodies(-wallNormal * (stickyWallGripAcceleration * GetActiveStickyWallGripMultiplier()), true);
+
+        Vector3 velocity = GetDrivenVelocity();
+        float slideSpeed = stickyWallSlideSpeed * GetActiveStickyWallSlideSpeedMultiplier();
+        if (velocity.y < -slideSpeed)
+            AddVelocityChangeToDrivenBodies(Vector3.up * (-slideSpeed - velocity.y), true);
     }
 
     private Vector3 ResolvePressureAwareMoveDirection(Vector3 desiredDirection)
@@ -703,6 +922,11 @@ public class SlimeMovementController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool IsLayerInMask(int layer, LayerMask mask)
+    {
+        return (mask.value & (1 << layer)) != 0;
     }
 
     private bool TryResolveDriveRigidbody(bool logWarning = true)
