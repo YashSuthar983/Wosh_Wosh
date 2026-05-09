@@ -559,6 +559,7 @@ public class SlimeSplitPiece : MonoBehaviour
 
         carriedItems.Add(new CarriedItemState { Item = carryable });
         UpdateCarriedItemLayout();
+        owner.PlayPickSound();
         return true;
     }
 

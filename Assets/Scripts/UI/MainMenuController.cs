@@ -12,6 +12,8 @@ namespace Heartwell.UI
         [Header("Scene Settings")]
         [SerializeField] private string firstLevelSceneName = "OpeningCutscene";
 
+        private bool isLoadingFirstLevel;
+
         private void Start()
         {
             // Auto-wire buttons at runtime to avoid Unity Editor persistent listener serialization issues
@@ -19,7 +21,11 @@ namespace Heartwell.UI
             if (playBtnObj != null)
             {
                 var btn = playBtnObj.GetComponent<UnityEngine.UI.Button>();
-                if (btn != null) btn.onClick.AddListener(Embark);
+                if (btn != null)
+                {
+                    btn.onClick.RemoveListener(Embark);
+                    btn.onClick.AddListener(Embark);
+                }
             }
 
             var optBtnObj = GameObject.Find("Btn_Options");
@@ -42,6 +48,12 @@ namespace Heartwell.UI
         /// </summary>
         public void Embark()
         {
+            if (isLoadingFirstLevel)
+            {
+                return;
+            }
+
+            isLoadingFirstLevel = true;
             Debug.Log($"Embark button clicked! Attempting to load scene: {firstLevelSceneName}");
             Time.timeScale = 1f; // Ensure time isn't frozen, which would break the cutscene coroutines
             SceneManager.LoadScene(firstLevelSceneName);

@@ -1731,6 +1731,20 @@ MonoBehaviour:
   stretchSpeedMultiplier: 0.65
   bridgeSpeedMultiplier: 0.85
   fullCarrySpeedMultiplier: 0.78
+  movementLoopClip: {fileID: 8300000, guid: 5e526492f5ce4eaf2a3864cf94001865,
+    type: 3}
+  movementAudioSource: {fileID: 0}
+  movementLoopVolume: 0.75
+  movementFadeSpeed: 7
+  movementMinPlanarSpeed: 0.12
+  movementPitchReferenceSpeed: 4.5
+  movementPitchRange: {x: 0.94, y: 1.08}
+  movementAudioRequiresGroundContact: 1
+  jumpClip: {fileID: 8300000, guid: c8f3c58c24834c5194c5139dcabb920f, type: 3}
+  jumpAudioSource: {fileID: 0}
+  jumpVolume: 0.85
+  jumpPitchRange: {x: 0.96, y: 1.04}
+  jumpMinInterval: 0.04
 --- !u!114 &952530732
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1874,6 +1888,11 @@ MonoBehaviour:
   releaseDistance: 0
   releaseUpOffset: 0
   releaseVelocity: 0
+  pickClip: {fileID: 8300000, guid: 5ca3d6c931a3f688c9938590c4f594e9, type: 3}
+  pickAudioSource: {fileID: 0}
+  pickVolume: 0.85
+  pickPitchRange: {x: 0.96, y: 1.04}
+  pickMinInterval: 0.04
 --- !u!1001 &971504175
 PrefabInstance:
   m_ObjectHideFlags: 0

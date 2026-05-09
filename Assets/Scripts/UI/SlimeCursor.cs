@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Heartwell.UI
@@ -12,6 +13,7 @@ namespace Heartwell.UI
         [Header("Movement Settings")]
         [SerializeField] private float followSpeed = 20f;
         [SerializeField] private float rotationSpeed = 10f;
+        [SerializeField] private float movementRotationThreshold = 5f;
         
         [Header("Squash & Stretch")]
         [SerializeField] private float stretchAmount = 0.5f;
@@ -39,6 +41,9 @@ namespace Heartwell.UI
         private float _animationTimer;
         private float _dropletTimer;
         private Vector2 _lastPos;
+        private Vector2 _stretchDirection = Vector2.right;
+
+        private bool IsMainMenuScene => SceneManager.GetActiveScene().name == "MainMenu";
 
         private void Awake()
         {
@@ -50,8 +55,7 @@ namespace Heartwell.UI
             _originalScale = _rectTransform.localScale;
             if (_originalScale.sqrMagnitude < 0.1f) _originalScale = Vector3.one;
             
-            // Hide hardware cursor
-            Cursor.visible = false;
+            ApplyHardwareCursorVisibility();
         }
 
         private void Start()
@@ -94,9 +98,10 @@ namespace Heartwell.UI
         {
             Vector3 mousePos = Input.mousePosition;
             Vector2 currentPos = (Vector2)mousePos;
-            
-            _velocity = (currentPos - _lastPos) / Time.unscaledDeltaTime;
-            transform.position = mousePos;
+
+            float deltaTime = Mathf.Max(Time.unscaledDeltaTime, 0.0001f);
+            _velocity = (currentPos - _lastPos) / deltaTime;
+            _rectTransform.position = mousePos;
             _lastPos = currentPos;
         }
 
@@ -113,9 +118,8 @@ namespace Heartwell.UI
             ApplyPhysicsVisuals();
             UpdateAnimation();
             UpdateTrails();
-            
-            // Force hardware cursor hide every frame
-            if (Cursor.visible) Cursor.visible = false;
+
+            ApplyHardwareCursorVisibility();
 
             // Final safety: ensure we are visible
             if (_cursorImage.sprite == null && animationFrames != null && animationFrames.Length > 0)
@@ -148,7 +152,7 @@ namespace Heartwell.UI
             dropObj.transform.SetSiblingIndex(_rectTransform.GetSiblingIndex()); // Behind cursor
             
             var dropRect = dropObj.AddComponent<RectTransform>();
-            dropRect.anchoredPosition = _rectTransform.anchoredPosition;
+            dropRect.position = _rectTransform.position;
             
             dropObj.AddComponent<CanvasRenderer>();
             var dropImg = dropObj.AddComponent<Image>();
@@ -193,40 +197,54 @@ namespace Heartwell.UI
             float speed = _velocity.magnitude;
             bool isClicking = Input.GetMouseButton(0);
             
-            // 1. Rotation
-            if (speed > 0.1f)
+            if (speed > movementRotationThreshold)
             {
-                float angle = Mathf.Atan2(_velocity.y, _velocity.x) * Mathf.Rad2Deg;
-                Quaternion targetRotation = Quaternion.Euler(0, 0, angle - 90f);
-                _rectTransform.rotation = Quaternion.Lerp(_rectTransform.rotation, targetRotation, Time.unscaledDeltaTime * rotationSpeed);
-            }
-            else if (!isClicking)
-            {
-                _rectTransform.rotation = Quaternion.Lerp(_rectTransform.rotation, Quaternion.identity, Time.unscaledDeltaTime * damping);
+                Vector2 targetDirection = _velocity.normalized;
+                float directionBlend = 1f - Mathf.Exp(-rotationSpeed * Time.unscaledDeltaTime);
+                _stretchDirection = Vector2.Lerp(_stretchDirection, targetDirection, directionBlend).normalized;
             }
 
-            // 2. Squash & Stretch
-            float stretch = 1f + (speed / 1000f) * stretchAmount;
-            
-            // Apply click/drag multiplier
-            if (isClicking) stretch *= clickStretchAmount;
-            else if (speed > 500f) stretch *= dragStretchMultiplier;
+            _rectTransform.localRotation = Quaternion.identity;
 
-            stretch = Mathf.Clamp(stretch, 0.5f, maxStretch * 2f);
-            float squash = 1f / stretch;
+            float movementStretch = Mathf.Clamp01(speed / 1200f) * stretchAmount;
+
+            if (isClicking)
+            {
+                movementStretch += Mathf.Max(0f, clickStretchAmount - 1f) * 0.2f;
+            }
+            else if (speed > 500f)
+            {
+                movementStretch *= dragStretchMultiplier;
+            }
+
+            movementStretch = Mathf.Min(movementStretch, maxStretch - 1f);
+
+            Vector2 axis = new Vector2(Mathf.Abs(_stretchDirection.x), Mathf.Abs(_stretchDirection.y));
+            float sharedStretch = movementStretch * 0.35f;
+            float directionalStretch = movementStretch * 0.75f;
+            float xStretch = 1f + sharedStretch + directionalStretch * axis.x;
+            float yStretch = 1f + sharedStretch + directionalStretch * axis.y;
 
             Vector3 targetScale = new Vector3(
-                _originalScale.x * squash,
-                _originalScale.y * stretch,
+                _originalScale.x * Mathf.Clamp(xStretch, 1f, maxStretch),
+                _originalScale.y * Mathf.Clamp(yStretch, 1f, maxStretch),
                 _originalScale.z
             );
-            
+
             _rectTransform.localScale = Vector3.Lerp(_rectTransform.localScale, targetScale, Time.unscaledDeltaTime * damping);
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
-            if (hasFocus) Cursor.visible = false;
+            if (hasFocus) ApplyHardwareCursorVisibility();
+        }
+
+        private void ApplyHardwareCursorVisibility()
+        {
+            if (!IsMainMenuScene) return;
+
+            Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.None;
         }
     }
 }

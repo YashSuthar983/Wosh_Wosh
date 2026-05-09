@@ -117,6 +117,13 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private float releaseUpOffset = 0.25f;
     [SerializeField] private float releaseVelocity = 2.4f;
 
+    [Header("Pickup Audio")]
+    [SerializeField] private AudioClip pickClip = null;
+    [SerializeField] private AudioSource pickAudioSource = null;
+    [SerializeField, Range(0f, 1f)] private float pickVolume = 0.85f;
+    [SerializeField] private Vector2 pickPitchRange = new Vector2(0.96f, 1.04f);
+    [SerializeField] private float pickMinInterval = 0.04f;
+
     private readonly List<SlimeSplitPiece> splitPieces = new List<SlimeSplitPiece>();
     private readonly List<CarriedItemState> carriedItems = new List<CarriedItemState>();
     private readonly Rigidbody[] stretchBoneBodies = new Rigidbody[6];
@@ -154,6 +161,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     private Rigidbody stretchRootBody;
     private Transform runtimeCarryContainer;
     private SlimeSplitPiece controlledSplitPiece;
+    private float lastPickAudioTime = -100f;
     private bool isSplit;
     private bool isMerged;
     private bool isStretching;
@@ -583,6 +591,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         ApplyColor(currentColor);
         RefreshSplitPieceColors();
         RefreshShapeTarget();
+        PlayPickSound();
         return true;
     }
 
@@ -675,6 +684,7 @@ public class SlimePlayerAbilities : MonoBehaviour
 
         carriedVolume += itemVolume;
         UpdateCarriedItemLayout();
+        PlayPickSound();
         return true;
     }
 
@@ -737,6 +747,43 @@ public class SlimePlayerAbilities : MonoBehaviour
         carriedItems.Clear();
         carriedVolume = 0f;
         return released;
+    }
+
+    public void PlayPickSound()
+    {
+        if (pickClip == null || pickVolume <= 0f)
+            return;
+
+        if (Time.time - lastPickAudioTime < Mathf.Max(0f, pickMinInterval))
+            return;
+
+        if (pickAudioSource == null)
+            pickAudioSource = gameObject.AddComponent<AudioSource>();
+
+        if (pickClip.loadState == AudioDataLoadState.Unloaded)
+            pickClip.LoadAudioData();
+
+        pickAudioSource.playOnAwake = false;
+        pickAudioSource.loop = false;
+        pickAudioSource.spatialBlend = 1f;
+        pickAudioSource.dopplerLevel = 0f;
+        pickAudioSource.rolloffMode = AudioRolloffMode.Linear;
+        pickAudioSource.minDistance = 2f;
+        pickAudioSource.maxDistance = 22f;
+        pickAudioSource.volume = 1f;
+        pickAudioSource.pitch = Random.Range(GetPickPitchMin(), GetPickPitchMax());
+        pickAudioSource.PlayOneShot(pickClip, pickVolume);
+        lastPickAudioTime = Time.time;
+    }
+
+    private float GetPickPitchMin()
+    {
+        return Mathf.Max(0.01f, Mathf.Min(pickPitchRange.x, pickPitchRange.y));
+    }
+
+    private float GetPickPitchMax()
+    {
+        return Mathf.Max(GetPickPitchMin(), Mathf.Max(pickPitchRange.x, pickPitchRange.y));
     }
 
     public bool CanSurvivePressure(float requiredResistance)

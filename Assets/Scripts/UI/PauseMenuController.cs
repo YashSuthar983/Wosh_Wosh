@@ -1,5 +1,7 @@
+using Heartwell.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class PauseMenuController : MonoBehaviour
 {
@@ -15,6 +17,13 @@ public class PauseMenuController : MonoBehaviour
     public UnityEngine.UI.Button resumeButton;
     public UnityEngine.UI.Button optionsButton;
     public UnityEngine.UI.Button exitButton;
+
+    [Header("Generated Button Sprites")]
+    public Sprite resumeButtonSprite;
+    public Sprite optionsButtonSprite;
+    public Sprite mainMenuButtonSprite;
+    public Vector2 generatedButtonSize = new Vector2(400f, 100f);
+    public float generatedButtonSpacing = 30f;
 
     private bool isPaused = false;
     private Coroutine activeCoroutine;
@@ -44,13 +53,17 @@ public class PauseMenuController : MonoBehaviour
 
     private Canvas GetTargetCanvas()
     {
-        Canvas c = GetComponentInParent<Canvas>();
+        Canvas c = GetComponentInParent<Canvas>(true);
         if (c != null) return c;
         if (pauseMenuPanel != null)
         {
-            c = pauseMenuPanel.GetComponentInParent<Canvas>();
+            c = pauseMenuPanel.GetComponent<Canvas>();
+            if (c != null) return c;
+
+            c = pauseMenuPanel.GetComponentInParent<Canvas>(true);
             if (c != null) return c;
         }
+
         GameObject pc = GameObject.Find("Pause_Canvas");
         if (pc != null) return pc.GetComponent<Canvas>();
         return null;
@@ -89,12 +102,120 @@ public class PauseMenuController : MonoBehaviour
             }
         }
 
+        EnsurePauseButtons(searchRoot);
+
         Debug.Log($"HEARTWELL: Pause Menu Buttons Auto-Linked - Resume: {(resumeButton != null ? resumeButton.name : "NULL")}, Options: {(optionsButton != null ? optionsButton.name : "NULL")}, Exit: {(exitButton != null ? exitButton.name : "NULL")}");
 
         // ALWAYS link listeners, overriding any old ones
         if (resumeButton != null) { resumeButton.onClick.RemoveAllListeners(); resumeButton.onClick.AddListener(Resume); }
         if (optionsButton != null) { optionsButton.onClick.RemoveAllListeners(); optionsButton.onClick.AddListener(OpenOptions); }
         if (exitButton != null) { exitButton.onClick.RemoveAllListeners(); exitButton.onClick.AddListener(ExitToMainMenu); }
+    }
+
+    private void EnsurePauseButtons(Transform searchRoot)
+    {
+        RectTransform buttonParent = ResolveButtonParent(searchRoot);
+        if (buttonParent == null)
+            return;
+
+        ConfigureButtonContainer(buttonParent);
+        resumeButton = EnsurePauseButton(resumeButton, "Btn_Resume", resumeButtonSprite, buttonParent);
+        optionsButton = EnsurePauseButton(optionsButton, "Btn_Options", optionsButtonSprite, buttonParent);
+        exitButton = EnsurePauseButton(exitButton, "Btn_MainMenu", mainMenuButtonSprite, buttonParent);
+    }
+
+    private RectTransform ResolveButtonParent(Transform searchRoot)
+    {
+        if (containerRect != null)
+            return containerRect;
+
+        if (pauseMenuPanel != null)
+        {
+            RectTransform[] childRects = pauseMenuPanel.GetComponentsInChildren<RectTransform>(true);
+            foreach (RectTransform childRect in childRects)
+            {
+                if (childRect != null && childRect.name == "Button_Container")
+                {
+                    containerRect = childRect;
+                    return childRect;
+                }
+            }
+
+            GameObject containerObject = new GameObject("Button_Container", typeof(RectTransform));
+            RectTransform rect = containerObject.GetComponent<RectTransform>();
+            rect.SetParent(pauseMenuPanel.transform, false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(Mathf.Max(450f, generatedButtonSize.x), 400f);
+            containerRect = rect;
+            return rect;
+        }
+
+        return searchRoot as RectTransform;
+    }
+
+    private void ConfigureButtonContainer(RectTransform buttonParent)
+    {
+        if (buttonParent == null)
+            return;
+
+        VerticalLayoutGroup layout = buttonParent.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+            layout = buttonParent.gameObject.AddComponent<VerticalLayoutGroup>();
+
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.spacing = generatedButtonSpacing;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+    }
+
+    private Button EnsurePauseButton(Button button, string buttonName, Sprite sprite, RectTransform parent)
+    {
+        if (button == null && sprite == null)
+            return null;
+
+        GameObject buttonObject;
+        if (button == null)
+        {
+            buttonObject = new GameObject(buttonName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(SquishButton));
+            buttonObject.transform.SetParent(parent, false);
+            button = buttonObject.GetComponent<Button>();
+        }
+        else
+        {
+            buttonObject = button.gameObject;
+            if (buttonObject.GetComponent<SquishButton>() == null)
+                buttonObject.AddComponent<SquishButton>();
+        }
+
+        buttonObject.name = buttonName;
+
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = generatedButtonSize;
+            rect.localScale = Vector3.one;
+        }
+
+        Image image = buttonObject.GetComponent<Image>();
+        if (image == null)
+            image = buttonObject.AddComponent<Image>();
+
+        if (sprite != null)
+            image.sprite = sprite;
+
+        image.color = Color.white;
+        image.raycastTarget = true;
+        image.preserveAspect = true;
+        button.targetGraphic = image;
+        return button;
     }
 
     void Update()
@@ -118,7 +239,11 @@ public class PauseMenuController : MonoBehaviour
     {
         if (resumeButton == null || exitButton == null) InitializeButtons();
 
-        if (pauseMenuPanel != null) pauseMenuPanel.SetActive(true);
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(true);
+            pauseMenuPanel.transform.localScale = Vector3.one;
+        }
         
         var canvas = GetTargetCanvas();
         if (canvas != null && !canvas.enabled) canvas.enabled = true;
@@ -127,8 +252,8 @@ public class PauseMenuController : MonoBehaviour
         
         Time.timeScale = 0f;
         isPaused = true;
-        
-        Cursor.visible = true;
+
+        Cursor.visible = SceneManager.GetActiveScene().name != "MainMenu";
         Cursor.lockState = CursorLockMode.None;
 
         if (activeCoroutine != null) StopCoroutine(activeCoroutine);
@@ -172,7 +297,7 @@ public class PauseMenuController : MonoBehaviour
             }
             else
             {
-                Cursor.visible = true;
+                Cursor.visible = false;
                 Cursor.lockState = CursorLockMode.None;
             }
         }
@@ -188,7 +313,7 @@ public class PauseMenuController : MonoBehaviour
     {
         Time.timeScale = 1f;
         
-        Cursor.visible = true;
+        Cursor.visible = false;
         Cursor.lockState = CursorLockMode.None;
         
         SceneManager.LoadScene("MainMenu");

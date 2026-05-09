@@ -89,6 +89,23 @@ public class SlimeMovementController : MonoBehaviour
     [SerializeField] private float bridgeSpeedMultiplier = 0.85f;
     [SerializeField, Range(0.1f, 1f)] private float fullCarrySpeedMultiplier = 0.78f;
 
+    [Header("Movement Audio")]
+    [SerializeField] private AudioClip movementLoopClip = null;
+    [SerializeField] private AudioSource movementAudioSource = null;
+    [SerializeField, Range(0f, 1f)] private float movementLoopVolume = 0.75f;
+    [SerializeField] private float movementFadeSpeed = 7f;
+    [SerializeField] private float movementMinPlanarSpeed = 0.12f;
+    [SerializeField] private float movementPitchReferenceSpeed = 4.5f;
+    [SerializeField] private Vector2 movementPitchRange = new Vector2(0.94f, 1.08f);
+    [SerializeField] private bool movementAudioRequiresGroundContact = true;
+
+    [Header("Jump Audio")]
+    [SerializeField] private AudioClip jumpClip = null;
+    [SerializeField] private AudioSource jumpAudioSource = null;
+    [SerializeField, Range(0f, 1f)] private float jumpVolume = 0.85f;
+    [SerializeField] private Vector2 jumpPitchRange = new Vector2(0.96f, 1.04f);
+    [SerializeField] private float jumpMinInterval = 0.04f;
+
     private readonly Collider[] groundHits = new Collider[16];
     private readonly RaycastHit[] groundRayHits = new RaycastHit[8];
     private readonly Rigidbody[] softbodyBodies = new Rigidbody[7];
@@ -109,6 +126,8 @@ public class SlimeMovementController : MonoBehaviour
     private bool stickyWallActive;
     private bool warnedMissingRigidbody;
     private int softbodyBodyCount;
+    private float movementAudioVolume;
+    private float lastJumpAudioTime = -100f;
 
     public Vector2 MoveInput => moveInput;
     public Vector3 Velocity => driveRigidbody != null ? driveRigidbody.velocity : Vector3.zero;
@@ -139,17 +158,20 @@ public class SlimeMovementController : MonoBehaviour
     private void Start()
     {
         TryResolveDriveRigidbody(false);
+        ConfigureMovementAudio();
     }
 
     private void Update()
     {
-        if (!readKeyboardInput)
-            return;
+        if (readKeyboardInput)
+        {
+            SetMoveInput(ReadWasdInput());
 
-        SetMoveInput(ReadWasdInput());
+            if (Input.GetKeyDown(jumpKey))
+                Jump();
+        }
 
-        if (Input.GetKeyDown(jumpKey))
-            Jump();
+        UpdateMovementAudio();
     }
 
     private void FixedUpdate()
@@ -184,6 +206,21 @@ public class SlimeMovementController : MonoBehaviour
             ApplySqueezeForces(requestedMoveDirection);
     }
 
+    private void OnDisable()
+    {
+        if (jumpAudioSource != null)
+            jumpAudioSource.Stop();
+
+        if (movementAudioSource == null)
+            return;
+
+        movementAudioVolume = 0f;
+        movementAudioSource.volume = 0f;
+
+        if (movementAudioSource.isPlaying)
+            movementAudioSource.Stop();
+    }
+
     public void SetMoveInput(Vector2 input)
     {
         input = Vector2.ClampMagnitude(input, 1f);
@@ -209,6 +246,7 @@ public class SlimeMovementController : MonoBehaviour
 
     public void Jump()
     {
+        PlayJumpSound();
         jumpQueued = true;
         jumpQueuedTime = Time.time;
     }
@@ -381,6 +419,135 @@ public class SlimeMovementController : MonoBehaviour
             AddVelocityChangeToDrivenBodies(jumpVelocityChange, includeWholeBody);
         else if (grounded && velocity.y < groundedStickVelocity)
             AddVelocityChangeToDrivenBodies(Vector3.up * (groundedStickVelocity - velocity.y), false);
+    }
+
+    private void ConfigureMovementAudio()
+    {
+        if (movementLoopClip == null)
+            return;
+
+        if (movementAudioSource == null)
+            movementAudioSource = FindMovementAudioSource();
+
+        if (movementAudioSource == null)
+            movementAudioSource = gameObject.AddComponent<AudioSource>();
+
+        if (movementLoopClip.loadState == AudioDataLoadState.Unloaded)
+            movementLoopClip.LoadAudioData();
+
+        movementAudioSource.clip = movementLoopClip;
+        movementAudioSource.loop = true;
+        movementAudioSource.playOnAwake = false;
+        movementAudioSource.volume = 0f;
+        movementAudioSource.pitch = Mathf.Clamp(1f, GetMovementPitchMin(), GetMovementPitchMax());
+        movementAudioSource.spatialBlend = 1f;
+        movementAudioSource.dopplerLevel = 0f;
+        movementAudioSource.rolloffMode = AudioRolloffMode.Linear;
+        movementAudioSource.minDistance = 2f;
+        movementAudioSource.maxDistance = 22f;
+        movementAudioSource.mute = false;
+
+        movementAudioVolume = 0f;
+
+        // Keep long movement loops running silently so short pauses do not restart the clip.
+        if (!movementAudioSource.isPlaying)
+            movementAudioSource.Play();
+    }
+
+    private AudioSource FindMovementAudioSource()
+    {
+        AudioSource[] sources = GetComponents<AudioSource>();
+        for (int i = 0; i < sources.Length; i++)
+        {
+            AudioSource source = sources[i];
+            if (source != null && (source.clip == null || source.clip == movementLoopClip))
+                return source;
+        }
+
+        return null;
+    }
+
+    private void UpdateMovementAudio()
+    {
+        if (movementLoopClip == null)
+            return;
+
+        if (movementAudioSource == null)
+            ConfigureMovementAudio();
+
+        if (movementAudioSource == null)
+            return;
+
+        if (!movementAudioSource.isPlaying)
+            movementAudioSource.Play();
+
+        float planarSpeed = 0f;
+        if (driveRigidbody != null)
+        {
+            Vector3 velocity = GetDrivenVelocity();
+            planarSpeed = new Vector3(velocity.x, 0f, velocity.z).magnitude;
+        }
+
+        float speed01 = movementPitchReferenceSpeed > 0f
+            ? Mathf.Clamp01(planarSpeed / movementPitchReferenceSpeed)
+            : 1f;
+        bool hasMoveInput = moveInput.sqrMagnitude > inputAxisThreshold * inputAxisThreshold;
+        bool hasGroundContact = grounded || stickyWallActive || !movementAudioRequiresGroundContact;
+        bool canMove = abilities == null || !abilities.IsCrushed;
+        bool shouldHearMovement = canMove && hasMoveInput && hasGroundContact && planarSpeed >= movementMinPlanarSpeed;
+        float targetVolume = shouldHearMovement ? movementLoopVolume * speed01 : 0f;
+        float fadeStep = Mathf.Max(0f, movementFadeSpeed) * Time.deltaTime;
+
+        movementAudioVolume = Mathf.MoveTowards(movementAudioVolume, targetVolume, fadeStep);
+        movementAudioSource.volume = movementAudioVolume;
+        movementAudioSource.pitch = Mathf.Lerp(GetMovementPitchMin(), GetMovementPitchMax(), speed01);
+    }
+
+    private float GetMovementPitchMin()
+    {
+        return Mathf.Max(0.01f, Mathf.Min(movementPitchRange.x, movementPitchRange.y));
+    }
+
+    private float GetMovementPitchMax()
+    {
+        return Mathf.Max(GetMovementPitchMin(), Mathf.Max(movementPitchRange.x, movementPitchRange.y));
+    }
+
+    private void PlayJumpSound()
+    {
+        if (jumpClip == null || jumpVolume <= 0f)
+            return;
+
+        if (Time.time - lastJumpAudioTime < Mathf.Max(0f, jumpMinInterval))
+            return;
+
+        if (jumpAudioSource == null)
+            jumpAudioSource = gameObject.AddComponent<AudioSource>();
+
+        if (jumpClip.loadState == AudioDataLoadState.Unloaded)
+            jumpClip.LoadAudioData();
+
+        jumpAudioSource.playOnAwake = false;
+        jumpAudioSource.loop = false;
+        jumpAudioSource.spatialBlend = 1f;
+        jumpAudioSource.dopplerLevel = 0f;
+        jumpAudioSource.rolloffMode = AudioRolloffMode.Linear;
+        jumpAudioSource.minDistance = 2f;
+        jumpAudioSource.maxDistance = 22f;
+        jumpAudioSource.volume = 1f;
+        jumpAudioSource.pitch = Random.Range(GetJumpPitchMin(), GetJumpPitchMax());
+        jumpAudioSource.PlayOneShot(jumpClip, jumpVolume);
+        lastJumpAudioTime = Time.time;
+    }
+
+    private float GetJumpPitchMin()
+    {
+        return Mathf.Max(0.01f, Mathf.Min(jumpPitchRange.x, jumpPitchRange.y));
+    }
+
+    private float GetJumpPitchMax()
+    {
+        return Mathf.Max(GetJumpPitchMin(), Mathf.Max(jumpPitchRange.x, jumpPitchRange.y));
     }
 
     private bool ConsumeJumpIfReady(bool canWallJump, Vector3 velocity, out Vector3 velocityChange)
