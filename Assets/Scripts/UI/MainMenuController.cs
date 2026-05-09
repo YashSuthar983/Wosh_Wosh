@@ -17,7 +17,6 @@ namespace Heartwell.UI
         /// </summary>
         public void Embark()
         {
-            Debug.Log("Embarking on the journey...");
             // TODO: Add transition/fading logic here
             SceneManager.LoadScene(firstLevelSceneName);
         }
@@ -27,7 +26,6 @@ namespace Heartwell.UI
         /// </summary>
         public void JoinJourney()
         {
-            Debug.Log("Opening Co-op Menu...");
             // TODO: Implement Multiplayer UI
         }
 
@@ -36,7 +34,6 @@ namespace Heartwell.UI
         /// </summary>
         public void OpenOptions()
         {
-            Debug.Log("Opening Options...");
             // TODO: Implement Settings Menu
         }
 
@@ -45,7 +42,6 @@ namespace Heartwell.UI
         /// </summary>
         public void QuitGame()
         {
-            Debug.Log("Quitting HEARTWELL. Come back soon!");
             Application.Quit();
             
             #if UNITY_EDITOR
