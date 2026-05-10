@@ -58,7 +58,9 @@ public class SlimeSplitPiece : MonoBehaviour
     private SlimePlayerAbilities owner;
     private Vector3 launchVelocity;
     private Vector3 mergeStartCenter;
+    private Vector3 mergeStartPosition;
     private Vector3 mergeStartScale;
+    private Vector3 mergeTargetPosition;
     private Vector3 baseLocalScale;
     private Vector3 targetLocalScale;
     private Vector3 lastAimDirection = Vector3.forward;
@@ -71,10 +73,12 @@ public class SlimeSplitPiece : MonoBehaviour
     private float volume = 1f;
     private int splitGeneration;
     private bool launchApplied;
+    private bool mergeVolumeApplied;
     private bool merging;
     private bool stretching;
     private SlimeSplitPiece mergeTargetPiece;
     private Renderer[] pieceRenderers;
+    private Color currentColor = Color.white;
 
     public bool IsMerging => merging;
     public bool IsKeyboardControlled => keyboardControlEnabled;
@@ -82,6 +86,8 @@ public class SlimeSplitPiece : MonoBehaviour
     public bool CanSplitFurther => splitGeneration < maxSplitGeneration;
     public Vector3 CenterPosition => GetCenterPosition();
     public float Volume => Mathf.Max(0f, volume);
+    public Renderer[] PieceRenderers => GetPieceRenderers();
+    public Color CurrentColor => currentColor;
 
     private void Awake()
     {
@@ -101,6 +107,7 @@ public class SlimeSplitPiece : MonoBehaviour
         mergeDuration = Mathf.Max(0f, newMergeDuration);
         volume = Mathf.Max(0f, newVolume);
         launchApplied = false;
+        mergeVolumeApplied = false;
         merging = false;
         stretching = false;
         keyboardControlEnabled = false;
@@ -145,13 +152,10 @@ public class SlimeSplitPiece : MonoBehaviour
     {
         float oldVolume = Mathf.Max(0.0001f, volume);
         volume = Mathf.Max(0f, newVolume);
-        float scaleRatio = Mathf.Pow(Mathf.Max(0.0001f, volume) / oldVolume, 1f / 3f);
+        float scaleRatio = Mathf.Sqrt(Mathf.Max(0.0001f, volume) / oldVolume);
 
         baseLocalScale *= scaleRatio;
         targetLocalScale *= scaleRatio;
-
-        if (!stretching && !merging)
-            transform.localScale = baseLocalScale;
     }
 
     public void SetKeyboardControl(bool enabled, Transform movementCamera)
@@ -263,23 +267,23 @@ public class SlimeSplitPiece : MonoBehaviour
             return;
 
         stretching = false;
+        launchApplied = true;
         ReleaseAllCarriedItems();
         merging = true;
+        mergeVolumeApplied = false;
         mergeTargetPiece = targetPiece;
         mergeDuration = Mathf.Max(0f, duration);
         mergeStartTime = Time.time;
         mergeStartScale = transform.localScale;
+        mergeStartPosition = transform.position;
         mergeStartCenter = GetCenterPosition();
+        mergeTargetPosition = GetMergeTargetPosition();
 
         if (mergeDuration <= 0.0001f)
         {
             CompleteMergeInstantly();
             return;
         }
-
-        SpringJoint[] springs = GetComponentsInChildren<SpringJoint>(true);
-        for (int i = 0; i < springs.Length; i++)
-            Destroy(springs[i]);
 
         Joint[] joints = GetComponentsInChildren<Joint>(true);
         for (int i = 0; i < joints.Length; i++)
@@ -294,18 +298,19 @@ public class SlimeSplitPiece : MonoBehaviour
             rigidbodies[i].angularVelocity = Vector3.zero;
             rigidbodies[i].isKinematic = true;
             rigidbodies[i].useGravity = false;
+            rigidbodies[i].detectCollisions = false;
+            rigidbodies[i].interpolation = RigidbodyInterpolation.None;
         }
 
         Collider[] colliders = GetComponentsInChildren<Collider>(true);
         for (int i = 0; i < colliders.Length; i++)
             colliders[i].enabled = false;
-
-        transform.position = mergeStartCenter;
     }
 
     private void CompleteMergeInstantly()
     {
-        transform.position = GetMergeTargetPosition();
+        ApplyMergeVolume();
+        transform.position = mergeTargetPosition;
         transform.localScale = Vector3.zero;
         gameObject.SetActive(false);
         Destroy(gameObject);
@@ -313,6 +318,8 @@ public class SlimeSplitPiece : MonoBehaviour
 
     public void SetColor(Color color)
     {
+        currentColor = color;
+
         if (pieceRenderers == null || pieceRenderers.Length == 0)
             pieceRenderers = GetComponentsInChildren<Renderer>(true);
 
@@ -334,6 +341,14 @@ public class SlimeSplitPiece : MonoBehaviour
     {
         if (propertyBlock == null)
             propertyBlock = new MaterialPropertyBlock();
+    }
+
+    private Renderer[] GetPieceRenderers()
+    {
+        if (pieceRenderers == null || pieceRenderers.Length == 0)
+            pieceRenderers = GetComponentsInChildren<Renderer>(true);
+
+        return pieceRenderers;
     }
 
     private void Update()
@@ -375,6 +390,9 @@ public class SlimeSplitPiece : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (merging)
+            ApplyMergeVolume();
+
         ReleaseAllCarriedItems();
 
         if (runtimeCarryContainer != null)
@@ -844,12 +862,37 @@ public class SlimeSplitPiece : MonoBehaviour
 
         float t = Mathf.Clamp01((Time.time - mergeStartTime) / mergeDuration);
         float eased = Mathf.SmoothStep(0f, 1f, t);
-        Vector3 targetCenter = GetMergeTargetPosition();
-        transform.position = Vector3.Lerp(mergeStartCenter, targetCenter, eased);
+        transform.position = Vector3.Lerp(mergeStartPosition, mergeTargetPosition, eased);
         transform.localScale = Vector3.Lerp(mergeStartScale, Vector3.zero, eased);
 
         if (t >= 1f)
+        {
+            ApplyMergeVolume();
             Destroy(gameObject);
+        }
+    }
+
+    private void ApplyMergeVolume()
+    {
+        if (mergeVolumeApplied)
+            return;
+
+        mergeVolumeApplied = true;
+
+        float volumeToApply = Volume;
+        if (volumeToApply <= 0f)
+            return;
+
+        if (mergeTargetPiece != null && !mergeTargetPiece.IsMerging)
+        {
+            mergeTargetPiece.AddVolume(volumeToApply);
+        }
+        else if (owner != null)
+        {
+            owner.AbsorbMergedSplitVolume(volumeToApply);
+        }
+
+        volume = 0f;
     }
 
     private Vector3 GetMergeTargetPosition()

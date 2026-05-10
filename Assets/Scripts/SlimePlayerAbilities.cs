@@ -81,7 +81,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private float splitSpawnRadius = 0.35f;
     [SerializeField] private float splitLaunchSpeed = 1.5f;
     [SerializeField] private float splitLaunchUpward = 2.5f;
-    [SerializeField] private float splitMergeDuration = 0f;
+    [SerializeField] private float splitMergeDuration = 0.18f;
     [SerializeField] private float splitMergeTouchRadius = 1.4f;
 
     [Header("Stretch")]
@@ -171,6 +171,8 @@ public class SlimePlayerAbilities : MonoBehaviour
     public int CarriedItemCount => carriedItems.Count;
     public float Health01 => maxHealth <= 0f ? 0f : currentHealth / maxHealth;
     public bool IsSplit => isSplit;
+    public IReadOnlyList<SlimeSplitPiece> ActiveSplitPieces => splitPieces;
+    public Color CurrentColor => currentColor;
     public bool IsMerged => isMerged;
     public bool IsStretching => isStretching;
     public bool IsBridging => activeBridgeCount > 0;
@@ -320,7 +322,6 @@ public class SlimePlayerAbilities : MonoBehaviour
 
             if ((piece.CenterPosition - center).sqrMagnitude <= radiusSqr)
             {
-                AbsorbSplitPieceVolume(piece);
                 piece.BeginMerge(splitMergeDuration);
                 splitPieces.RemoveAt(i);
                 merged++;
@@ -351,7 +352,6 @@ public class SlimePlayerAbilities : MonoBehaviour
             return false;
 
         splitPieces.RemoveAt(pieceIndex);
-        AbsorbSplitPieceVolume(piece);
         piece.BeginMerge(splitMergeDuration);
 
         if (splitPieces.Count == 0)
@@ -394,7 +394,6 @@ public class SlimePlayerAbilities : MonoBehaviour
 
             if ((piece.CenterPosition - center).sqrMagnitude <= radiusSqr)
             {
-                targetPiece.AddVolume(piece.Volume);
                 piece.BeginMergeToSplitPiece(targetPiece, splitMergeDuration);
                 splitPieces.RemoveAt(i);
                 merged++;
@@ -432,7 +431,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         splitDirection = Quaternion.Euler(0f, angle, 0f) * splitDirection;
 
         float childVolume = sourcePiece.TakeSplitVolume(splitVolumeFraction, minSplitPieceVolume);
-        if (childVolume <= 0f)
+        if (childVolume < minSplitPieceVolume)
             return null;
 
         Material sharedMaterial = slimeRenderer != null ? slimeRenderer.sharedMaterial : null;
@@ -594,15 +593,15 @@ public class SlimePlayerAbilities : MonoBehaviour
             : Mathf.Max(minBodyVolume, gainedVolume);
     }
 
-    private void AbsorbSplitPieceVolume(SlimeSplitPiece piece)
+    public void AbsorbMergedSplitVolume(float volumeGain)
     {
-        if (piece != null)
-            AddVolume(piece.Volume);
+        AddVolume(volumeGain);
+        RefreshShapeTarget();
     }
 
     private float GetSplitPieceScale(float pieceVolume)
     {
-        return Mathf.Max(0.05f, GetVolumeRadiusScale(pieceVolume) * Mathf.Max(0.01f, splitPieceScale));
+        return Mathf.Max(0.05f, GetSplitViewScale(pieceVolume) * Mathf.Max(0.01f, splitPieceScale));
     }
 
     public bool TryAbsorbNearbySlime(Vector3 center, float radius)
@@ -1280,6 +1279,12 @@ public class SlimePlayerAbilities : MonoBehaviour
         return Mathf.Pow(Mathf.Max(volume, minBodyVolume) / Mathf.Max(baseVolume, 0.001f), 1f / 3f);
     }
 
+    private float GetSplitViewScale(float volume)
+    {
+        float normalizedVolume = Mathf.Max(0.0001f, volume) / Mathf.Max(baseVolume, 0.001f);
+        return Mathf.Sqrt(normalizedVolume);
+    }
+
     private Quaternion GetStretchTargetRotation()
     {
         Vector3 direction = lastAimDirection;
@@ -1311,7 +1316,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         }
         else if (isSplit)
         {
-            shape *= splitScale;
+            shape = Vector3.one * GetSplitViewScale(BodyVolume) * splitScale;
         }
         else if (isMerged)
         {
@@ -1412,7 +1417,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             return false;
 
         float pieceVolume = totalSplitVolume / count;
-        if (pieceVolume <= 0f)
+        if (pieceVolume < minSplitPieceVolume)
             return false;
 
         currentVolume = Mathf.Max(minBodyVolume, currentVolume - totalSplitVolume);
@@ -1474,7 +1479,6 @@ public class SlimePlayerAbilities : MonoBehaviour
         {
             if (splitPieces[i] != null)
             {
-                AbsorbSplitPieceVolume(splitPieces[i]);
                 splitPieces[i].BeginMerge(splitMergeDuration);
             }
         }
@@ -1493,7 +1497,6 @@ public class SlimePlayerAbilities : MonoBehaviour
                     Destroy(splitPieces[i].gameObject);
                 else
                 {
-                    AbsorbSplitPieceVolume(splitPieces[i]);
                     splitPieces[i].BeginMerge(splitMergeDuration);
                 }
             }

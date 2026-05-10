@@ -1838,12 +1838,12 @@ MonoBehaviour:
   maxSplitPieces: 24
   splitVolumeFraction: 0.5
   minSplitPieceVolume: 0.05
-  splitScale: 0.62
-  splitPieceScale: 0.5
+  splitScale: 1
+  splitPieceScale: 1
   splitSpawnRadius: 0.35
   splitLaunchSpeed: 0.54
   splitLaunchUpward: 2.5
-  splitMergeDuration: 0
+  splitMergeDuration: 0.18
   splitMergeTouchRadius: 1.1
   stretchLength: 2.6
   stretchThickness: 0.55

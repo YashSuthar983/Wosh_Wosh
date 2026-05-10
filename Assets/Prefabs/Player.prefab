@@ -323,7 +323,7 @@ MonoBehaviour:
   splitSpawnRadius: 0.35
   splitLaunchSpeed: 0.54
   splitLaunchUpward: 2.5
-  splitMergeDuration: 0
+  splitMergeDuration: 0.18
   splitMergeTouchRadius: 1.1
   stretchLength: 2.6
   stretchThickness: 0.55
