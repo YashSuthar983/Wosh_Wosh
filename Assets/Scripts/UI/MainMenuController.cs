@@ -72,7 +72,7 @@ namespace Heartwell.UI
         /// </summary>
         public void OpenOptions()
         {
-            // TODO: Implement Settings Menu
+            InGameOverlayUI.ShowOptionsShell();
         }
 
         /// <summary>

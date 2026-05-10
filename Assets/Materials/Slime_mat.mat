@@ -19,6 +19,7 @@ Material:
   - _OUTLINE_POS
   m_InvalidKeywords:
   - _DISABLE_SSR_TRANSPARENT
+  - _EMISSION
   - _NORMALMAP_TANGENT_SPACE
   - _SEGMENTED_ON
   m_LightmapFlags: 4
@@ -230,7 +231,7 @@ Material:
     - _BaseColorVisible: 1
     - _BaseColor_Step: 0.539
     - _BaseShade_Feather: 0.238
-    - _Base_Speed: 0
+    - _Base_Speed: -1.03
     - _BlendMode: 0
     - _BlurLevelMatcap: 0
     - _BlurLevelSGM: 0
@@ -357,19 +358,19 @@ Material:
     - _PPDPrimitiveWidth: 1
     - _ReceivesSSR: 1
     - _RefractionModel: 0
-    - _RimLight: 0
+    - _RimLight: 1
     - _RimLightOverridden: 0
     - _RimLightVisible: 1
     - _RimLight_FeatherOff: 0
     - _RimLight_InsideMask: 0.0001
-    - _RimLight_Power: 0.1
-    - _Rotate_EmissiveUV: 0
+    - _RimLight_Power: 0.081
+    - _Rotate_EmissiveUV: -0.64
     - _Rotate_MatCapUV: 0
     - _Rotate_NormalMapForMatCapUV: 0
     - _SPRDefaultUnlitColorMask: 0
     - _SRPDefaultUnlitColMode: 2
     - _SSRefractionProjectionModel: 0
-    - _Scroll_EmissiveU: 0
+    - _Scroll_EmissiveU: -0.27
     - _Scroll_EmissiveV: 0
     - _SecondShadeOverridden: 0
     - _SecondShadeVisible: 1
@@ -462,7 +463,7 @@ Material:
     - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - _EmissiveColorLDR: {r: 0, g: 0, b: 0, a: 1}
-    - _Emissive_Color: {r: 0, g: 0, b: 0, a: 1}
+    - _Emissive_Color: {r: 0, g: 0.2805305, b: 0.27769625, a: 1}
     - _FirstShadeMaskColor: {r: 0, g: 1, b: 1, a: 1}
     - _HighColor: {r: 0, g: 0, b: 0, a: 1}
     - _HighlightMaskColor: {r: 1, g: 1, b: 0, a: 1}

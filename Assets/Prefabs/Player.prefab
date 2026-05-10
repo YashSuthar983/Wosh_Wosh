@@ -84,6 +84,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 2603463230943973011}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 64d461f937bc7fa5684ca02e129e5031,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8176202457215399432}
   m_SourcePrefab: {fileID: 100100000, guid: 64d461f937bc7fa5684ca02e129e5031, type: 3}
 --- !u!1 &2439326582523005713 stripped
 GameObject:
@@ -242,7 +246,6 @@ MonoBehaviour:
   splitSpeedMultiplier: 1.15
   mergedSpeedMultiplier: 1
   stretchSpeedMultiplier: 0.65
-  bridgeSpeedMultiplier: 0.85
   fullCarrySpeedMultiplier: 0.78
   movementLoopClip: {fileID: 8300000, guid: 5e526492f5ce4eaf2a3864cf94001865,
     type: 3}
@@ -277,7 +280,6 @@ MonoBehaviour:
   bodyRigidbody: {fileID: 0}
   splitPiecePrefab: {fileID: 4838354347015398771, guid: b4a750580e16e66f6bed5cfad8bf0ff8,
     type: 3}
-  bridgePrefab: {fileID: 0}
   readKeyboardInput: 1
   cameraTransform: {fileID: 0}
   cameraRelativeAim: 1
@@ -289,7 +291,6 @@ MonoBehaviour:
   mergeKey: 101
   stretchKey: 304
   alternateStretchKey: 303
-  bridgeKey: 102
   carryKey: 99
   controlLastSplitPieceWithArrowKeys: 1
   splitPieceCameraRelativeMovement: 1
@@ -301,7 +302,6 @@ MonoBehaviour:
   splitPieceMergeKey: 307
   splitPieceStretchKey: 303
   splitPieceAlternateStretchKey: 0
-  splitPieceBridgeKey: 13
   splitPieceCarryKey: 256
   splitPieceMaxSplitGeneration: 1
   splitPieceMoveSpeed: 3.8
@@ -337,7 +337,7 @@ MonoBehaviour:
   splitSpawnRadius: 0.35
   splitLaunchSpeed: 0.54
   splitLaunchUpward: 2.5
-  splitMergeDuration: 0
+  splitMergeDuration: 0.18
   splitMergeTouchRadius: 1.1
   stretchLength: 2.6
   stretchThickness: 0.55
@@ -349,12 +349,6 @@ MonoBehaviour:
   stretchRelaxedSpring: 18
   stretchRelaxedDamper: 12
   stretchReturnDuration: 0.25
-  bridgeLength: 3.4
-  bridgeWidth: 0.9
-  bridgeThickness: 0.22
-  bridgeDuration: 2.5
-  bridgeVolumeCost: 0.2
-  bridgeYOffset: 0.05
   carryContainer: {fileID: 0}
   keepCarryContainerAtBodyCenter: 1
   carryPickupRadius: 1.1
@@ -373,6 +367,48 @@ MonoBehaviour:
   pickVolume: 0.85
   pickPitchRange: {x: 0.96, y: 1.04}
   pickMinInterval: 0.04
+  defaultAbsorbAbilityDuration: 15
+--- !u!114 &8176202457215399432
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7034946774489272794}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2609e5a37b44cf79b2f8f6a7642fbfd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  abilities: {fileID: 2603463230943973011}
+  originOverride: {fileID: 0}
+  readKeyboardInput: 1
+  waveKey: 114
+  cooldown: 1.2
+  requireAbsorbedAbility: 1
+  requiredAbility: 1
+  waveMaterial: {fileID: 2100000, guid: 1d12490fb4685ba808d2a4faef3c2089, type: 2}
+  waveColor: {r: 0.25, g: 0.95, b: 0.55, a: 0.72}
+  startRadius: 0.45
+  maxRadius: 7
+  travelSpeed: 7
+  ringWidth: 0.9
+  crestHeight: 0.24
+  surfaceHeight: 0.08
+  fallDuration: 0.42
+  fallDistance: 0.16
+  meshSegments: 120
+  damage: 1
+  hitMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  snapToGround: 1
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundProbeStart: 1.6
+  groundProbeDistance: 5
+  fallbackGroundOffset: 0.65
 --- !u!1 &8634109596397010280 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1923824217161421283, guid: 64d461f937bc7fa5684ca02e129e5031,

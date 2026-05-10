@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,6 +7,9 @@ public class SlimePlayerAbilities : MonoBehaviour
 {
     private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
+    private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
+    private static readonly int EmissiveColor = Shader.PropertyToID("_EmissiveColor");
+    private const int AbsorbRingSegments = 56;
 
     [Header("References")]
     [SerializeField] private Transform bodyRoot = null;
@@ -13,7 +17,6 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private Material slimeMaterialOverride = null;
     [SerializeField] private Rigidbody bodyRigidbody = null;
     [SerializeField] private GameObject splitPiecePrefab = null;
-    [SerializeField] private GameObject bridgePrefab = null;
 
     [Header("Input")]
     [SerializeField] private bool readKeyboardInput = true;
@@ -27,7 +30,6 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private KeyCode mergeKey = KeyCode.E;
     [SerializeField] private KeyCode stretchKey = KeyCode.LeftShift;
     [SerializeField] private KeyCode alternateStretchKey = KeyCode.RightShift;
-    [SerializeField] private KeyCode bridgeKey = KeyCode.F;
     [SerializeField] private KeyCode carryKey = KeyCode.C;
 
     [Header("Last Split Input")]
@@ -41,7 +43,6 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private KeyCode splitPieceMergeKey = KeyCode.RightAlt;
     [SerializeField] private KeyCode splitPieceStretchKey = KeyCode.RightShift;
     [SerializeField] private KeyCode splitPieceAlternateStretchKey = KeyCode.None;
-    [SerializeField] private KeyCode splitPieceBridgeKey = KeyCode.Return;
     [SerializeField] private KeyCode splitPieceCarryKey = KeyCode.Keypad0;
     [SerializeField, Min(0)] private int splitPieceMaxSplitGeneration = 1;
     [SerializeField] private float splitPieceMoveSpeed = 3.8f;
@@ -59,6 +60,8 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private float bodyShapeBoneDamping = 8f;
     [SerializeField] private float bodyShapeBoneMaxVelocityChange = 2f;
     [SerializeField] private float maxHealth = 1f;
+    [SerializeField] private bool hitDamageReducesVolume = true;
+    [SerializeField] private bool hitDamageScalesMass = false;
 
     [Header("Merge")]
     [SerializeField] private float mergeScale = 1.25f;
@@ -81,8 +84,18 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private float splitSpawnRadius = 0.35f;
     [SerializeField] private float splitLaunchSpeed = 1.5f;
     [SerializeField] private float splitLaunchUpward = 2.5f;
-    [SerializeField] private float splitMergeDuration = 0f;
+    [SerializeField] private float splitMergeDuration = 0.18f;
     [SerializeField] private float splitMergeTouchRadius = 1.4f;
+
+    [Header("Split/Merge Momentum")]
+    [SerializeField, Range(0f, 1f)] private float splitLaunchVelocityScale = 0.75f;
+    [SerializeField, Min(0f)] private float maxSplitLaunchPlanarSpeed = 1.35f;
+    [SerializeField, Min(0f)] private float maxSplitLaunchUpwardSpeed = 1.85f;
+    [SerializeField, Range(0f, 1f)] private float splitTransitionVelocityRetain = 0.85f;
+    [SerializeField, Range(0f, 1f)] private float mergeTransitionVelocityRetain = 0.9f;
+    [SerializeField, Min(0f)] private float maxTransitionPlanarSpeed = 4.8f;
+    [SerializeField, Min(0f)] private float maxTransitionUpwardSpeed = 2f;
+    [SerializeField, Range(0f, 1f)] private float transitionAngularVelocityRetain = 0.35f;
 
     [Header("Stretch")]
     [SerializeField] private float stretchLength = 2.6f;
@@ -95,14 +108,6 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private float stretchRelaxedSpring = 18f;
     [SerializeField] private float stretchRelaxedDamper = 12f;
     [SerializeField] private float stretchReturnDuration = 0.25f;
-
-    [Header("Bridge")]
-    [SerializeField] private float bridgeLength = 3.4f;
-    [SerializeField] private float bridgeWidth = 0.9f;
-    [SerializeField] private float bridgeThickness = 0.22f;
-    [SerializeField] private float bridgeDuration = 2.5f;
-    [SerializeField] private float bridgeVolumeCost = 0.2f;
-    [SerializeField] private float bridgeYOffset = 0.05f;
 
     [Header("Carry")]
     [SerializeField] private Transform carryContainer = null;
@@ -124,6 +129,21 @@ public class SlimePlayerAbilities : MonoBehaviour
     [SerializeField] private Vector2 pickPitchRange = new Vector2(0.96f, 1.04f);
     [SerializeField] private float pickMinInterval = 0.04f;
 
+    [Header("Timed Abilities")]
+    [SerializeField] private float defaultAbsorbAbilityDuration = 15f;
+
+    [Header("Absorb Feedback")]
+    [SerializeField] private float absorbPulseScale = 1.32f;
+    [SerializeField] private float absorbPulseDuration = 0.46f;
+    [SerializeField, Range(0f, 1f)] private float absorbFlashStrength = 0.9f;
+    [SerializeField] private float absorbSquashAmount = 0.14f;
+    [SerializeField] private float absorbGlowIntensity = 1.75f;
+    [SerializeField] private bool absorbRingEnabled = true;
+    [SerializeField] private float absorbRingStartRadius = 0.35f;
+    [SerializeField] private float absorbRingEndRadius = 1.55f;
+    [SerializeField] private float absorbRingYOffset = 0.08f;
+    [SerializeField] private float absorbRingWidth = 0.08f;
+
     private readonly List<SlimeSplitPiece> splitPieces = new List<SlimeSplitPiece>();
     private readonly List<CarriedItemState> carriedItems = new List<CarriedItemState>();
     private readonly Rigidbody[] stretchBoneBodies = new Rigidbody[6];
@@ -132,6 +152,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     private readonly Vector3[] stretchBoneBaseConnectedAnchors = new Vector3[6];
     private readonly float[] stretchBoneBaseSprings = new float[6];
     private readonly float[] stretchBoneBaseDampers = new float[6];
+    private readonly float[] stretchBoneBaseMasses = new float[6];
     private readonly bool[] stretchBoneBaseAutoConfigureAnchors = new bool[6];
     private readonly Collider[] absorbHits = new Collider[32];
     private readonly Collider[] carryHits = new Collider[32];
@@ -148,20 +169,32 @@ public class SlimePlayerAbilities : MonoBehaviour
     private Vector3 targetBodyShape = Vector3.one;
     private Vector3 lastAimDirection = Vector3.forward;
     private Color currentColor = new Color(0.25f, 0.95f, 0.55f, 1f);
+    private Color neutralColor = new Color(0.25f, 0.95f, 0.55f, 1f);
     private float currentVolume;
-    private float reservedBridgeVolume;
     private float carriedVolume;
     private float absorbedPressureBonus;
     private float stretchMultiplierBonus;
-    private float bridgeDurationBonus;
+    private float timedPressureResistanceBonus;
+    private float timedStretchMultiplierBonus;
+    private float materialAbilityExpireTime = -1f;
+    private float materialAbilityDuration;
+    private SlimeMaterialType timedMaterialAbility = SlimeMaterialType.Neutral;
+    private SlimeAbsorbAbility activeAbsorbAbility = SlimeAbsorbAbility.None;
+    private float activeAbsorbAbilityExpireTime = -1f;
+    private float activeAbsorbAbilityDuration;
     private float currentHealth;
+    private float baseBodyMass = -1f;
     private float stretchReleasedTime = -100f;
-    private int activeBridgeCount;
     private BoneSphere boneSphere;
     private Rigidbody stretchRootBody;
     private Transform runtimeCarryContainer;
     private SlimeSplitPiece controlledSplitPiece;
+    private Coroutine absorbFeedbackCoroutine;
+    private LineRenderer absorbRingRenderer;
+    private Material absorbRingMaterial;
     private float lastPickAudioTime = -100f;
+    private float absorbFeedbackScale = 1f;
+    private Vector3 absorbFeedbackShape = Vector3.one;
     private bool isSplit;
     private bool isMerged;
     private bool isStretching;
@@ -171,7 +204,9 @@ public class SlimePlayerAbilities : MonoBehaviour
 
     public SlimeMaterialType CurrentMaterial { get; private set; }
     public float CurrentVolume => currentVolume;
-    public float BodyVolume => Mathf.Max(minBodyVolume, currentVolume - reservedBridgeVolume);
+    public Color CurrentColor => currentColor;
+    public Material SlimeSharedMaterial => slimeRenderer != null ? slimeRenderer.sharedMaterial : slimeMaterialOverride;
+    public float BodyVolume => Mathf.Max(minBodyVolume, currentVolume);
     public float CarriedVolume => carriedVolume;
     public float CarryCapacity => GetCarryCapacity();
     public float FreeCarryVolume => Mathf.Max(0f, CarryCapacity - carriedVolume);
@@ -179,20 +214,21 @@ public class SlimePlayerAbilities : MonoBehaviour
     public int CarriedItemCount => carriedItems.Count;
     public float Health01 => maxHealth <= 0f ? 0f : currentHealth / maxHealth;
     public bool IsSplit => isSplit;
+    public IReadOnlyList<SlimeSplitPiece> ActiveSplitPieces => splitPieces;
     public bool IsMerged => isMerged;
     public bool IsStretching => isStretching;
-    public bool IsBridging => activeBridgeCount > 0;
     public bool IsCrushed => isCrushed;
     public float PressureResistance
     {
         get
         {
             float pressureVolume = pressureScalesWithVolume ? BodyVolume : Mathf.Max(minBodyVolume, baseVolume);
-            float absorbBonus = absorbAddsPressureBonus ? absorbedPressureBonus : 0f;
+            float absorbBonus = absorbAddsPressureBonus ? absorbedPressureBonus + timedPressureResistanceBonus : 0f;
             float mergeBonus = mergeAddsPressureBonus && isMerged ? mergedPressureBonus : 0f;
             return pressureVolume * pressureResistancePerVolume + absorbBonus + mergeBonus;
         }
     }
+    private float TotalStretchMultiplierBonus => stretchMultiplierBonus + timedStretchMultiplierBonus;
     public Vector3 BodyCenterPosition => GetBodyCenterPosition();
 
     private void Awake()
@@ -208,6 +244,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         if (slimeRenderer != null && slimeRenderer.sharedMaterial != null)
             currentColor = ResolveRendererColor(slimeRenderer);
 
+        neutralColor = currentColor;
         ApplyColor(currentColor);
     }
 
@@ -220,6 +257,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     private void Update()
     {
         PruneCarriedItems();
+        UpdateTimedAbsorbAbilities();
 
         if (isCrushed)
         {
@@ -256,6 +294,7 @@ public class SlimePlayerAbilities : MonoBehaviour
 
     private void OnDisable()
     {
+        ResetAbsorbFeedback();
         SetStretchJointsRelaxed(false);
         ReleaseAllCarriedItems();
     }
@@ -263,6 +302,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     private void OnDestroy()
     {
         ReleaseAllCarriedItems();
+        DestroyAbsorbRing();
 
         if (runtimeCarryContainer != null)
             Destroy(runtimeCarryContainer.gameObject);
@@ -290,6 +330,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         isStretching = false;
         isSplit = true;
         RefreshShapeTarget();
+        DampenSplitTransitionMomentum();
     }
 
     public void Merge()
@@ -303,6 +344,7 @@ public class SlimePlayerAbilities : MonoBehaviour
 
         MergeSplitPieces();
         RefreshShapeTarget();
+        DampenMergeTransitionMomentum();
     }
 
     public int MergeNearbySplitPieces()
@@ -328,7 +370,6 @@ public class SlimePlayerAbilities : MonoBehaviour
 
             if ((piece.CenterPosition - center).sqrMagnitude <= radiusSqr)
             {
-                AbsorbSplitPieceVolume(piece);
                 piece.BeginMerge(splitMergeDuration);
                 splitPieces.RemoveAt(i);
                 merged++;
@@ -340,6 +381,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             isSplit = false;
             SetControlledSplitPiece(null);
             RefreshShapeTarget();
+            DampenMergeTransitionMomentum();
         }
         else
         {
@@ -359,7 +401,6 @@ public class SlimePlayerAbilities : MonoBehaviour
             return false;
 
         splitPieces.RemoveAt(pieceIndex);
-        AbsorbSplitPieceVolume(piece);
         piece.BeginMerge(splitMergeDuration);
 
         if (splitPieces.Count == 0)
@@ -367,6 +408,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             isSplit = false;
             SetControlledSplitPiece(null);
             RefreshShapeTarget();
+            DampenMergeTransitionMomentum();
         }
         else
         {
@@ -402,7 +444,6 @@ public class SlimePlayerAbilities : MonoBehaviour
 
             if ((piece.CenterPosition - center).sqrMagnitude <= radiusSqr)
             {
-                targetPiece.AddVolume(piece.Volume);
                 piece.BeginMergeToSplitPiece(targetPiece, splitMergeDuration);
                 splitPieces.RemoveAt(i);
                 merged++;
@@ -440,7 +481,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         splitDirection = Quaternion.Euler(0f, angle, 0f) * splitDirection;
 
         float childVolume = sourcePiece.TakeSplitVolume(splitVolumeFraction, minSplitPieceVolume);
-        if (childVolume <= 0f)
+        if (childVolume < minSplitPieceVolume)
             return null;
 
         Material sharedMaterial = slimeRenderer != null ? slimeRenderer.sharedMaterial : null;
@@ -457,7 +498,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         if (splitPiece == null)
             splitPiece = piece.AddComponent<SlimeSplitPiece>();
 
-        Vector3 launchVelocity = splitDirection * splitLaunchSpeed + Vector3.up * (splitLaunchUpward * 0.75f);
+        Vector3 launchVelocity = BuildSplitLaunchVelocity(splitDirection, 1f, 0.75f);
         splitPiece.Init(this, launchVelocity, sharedMaterial, currentColor, childVolume, splitMergeDuration);
         splitPiece.SetSplitGeneration(sourcePiece.SplitGeneration + 1, splitPieceMaxSplitGeneration);
         splitPieces.Add(splitPiece);
@@ -477,6 +518,7 @@ public class SlimePlayerAbilities : MonoBehaviour
 
         MergeSplitPieces();
         RefreshShapeTarget();
+        DampenMergeTransitionMomentum();
     }
 
     public void BeginStretch(Vector3 worldDirection)
@@ -503,67 +545,6 @@ public class SlimePlayerAbilities : MonoBehaviour
         stretchReleasedTime = Time.time;
     }
 
-    public GameObject BuildBridge(Vector3 worldDirection)
-    {
-        if (isCrushed)
-            return null;
-
-        SetAimDirection(worldDirection);
-
-        float availableVolume = Mathf.Max(0f, currentVolume - reservedBridgeVolume - minBodyVolume);
-        float reserve = Mathf.Min(bridgeVolumeCost, availableVolume);
-        if (reserve <= 0f && bridgeVolumeCost > 0f)
-            return null;
-
-        if (WouldOverloadCarriedItemsAfterBridgeReserve(reserve))
-            return null;
-
-        reservedBridgeVolume += reserve;
-        activeBridgeCount++;
-
-        Vector3 direction = lastAimDirection.sqrMagnitude > 0.0001f ? lastAimDirection.normalized : transform.forward;
-        float volumeScale = Mathf.Pow(Mathf.Max(BodyVolume, minBodyVolume) / Mathf.Max(baseVolume, 0.001f), 1f / 3f);
-        float length = bridgeLength * Mathf.Max(0.5f, volumeScale);
-        float width = bridgeWidth * Mathf.Max(0.55f, volumeScale);
-        Vector3 start = GetBodyCenterPosition() + Vector3.up * bridgeYOffset;
-        Vector3 center = start + direction * (length * 0.5f);
-
-        GameObject bridge = bridgePrefab != null ? Instantiate(bridgePrefab) : GameObject.CreatePrimitive(PrimitiveType.Cube);
-        bridge.name = "Slime Body Bridge";
-        bridge.transform.position = center;
-        bridge.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
-        bridge.transform.localScale = new Vector3(width, bridgeThickness, length);
-
-        Collider bridgeCollider = bridge.GetComponent<Collider>();
-        if (bridgeCollider == null)
-            bridgeCollider = bridge.AddComponent<BoxCollider>();
-
-        bridgeCollider.isTrigger = false;
-
-        Rigidbody bridgeBody = bridge.GetComponent<Rigidbody>();
-        if (bridgeBody != null)
-        {
-            bridgeBody.isKinematic = true;
-            bridgeBody.useGravity = false;
-        }
-
-        Renderer bridgeRenderer = bridge.GetComponentInChildren<Renderer>();
-        if (bridgeRenderer != null)
-        {
-            if (slimeRenderer != null)
-                bridgeRenderer.sharedMaterial = slimeRenderer.sharedMaterial;
-
-            ApplyColor(bridgeRenderer, currentColor);
-        }
-
-        SlimeBridgeSegment segment = bridge.GetComponent<SlimeBridgeSegment>();
-        if (segment == null)
-            segment = bridge.AddComponent<SlimeBridgeSegment>();
-
-        segment.Init(this, bridgeDuration + bridgeDurationBonus, reserve);
-        return bridge;
-    }
-
     public bool TryAbsorb(SlimeAbsorbable absorbable)
     {
         if (absorbable == null)
@@ -572,46 +553,201 @@ public class SlimePlayerAbilities : MonoBehaviour
         if (isCrushed)
             return false;
 
-        AddVolume(absorbable.VolumeGain);
-        if (absorbAddsPressureBonus)
-            absorbedPressureBonus += absorbable.PressureResistanceBonus;
-
-        stretchMultiplierBonus += absorbable.StretchMultiplierBonus;
-        bridgeDurationBonus += absorbable.BridgeDurationBonus;
-
+        AddVolume(absorbable.VolumeGain, hitDamageScalesMass);
         SlimeMaterialType absorbedMaterial = absorbable.MaterialType;
-        bool materialChanged = absorbedMaterial != CurrentMaterial;
-        CurrentMaterial = absorbedMaterial;
+        float abilityDuration = ResolveAbsorbAbilityDuration(absorbable);
+        if (absorbedMaterial != SlimeMaterialType.Neutral)
+        {
+            ActivateMaterialAbility(absorbable, absorbedMaterial, abilityDuration);
+        }
+        else
+        {
+            if (absorbAddsPressureBonus)
+                absorbedPressureBonus += absorbable.PressureResistanceBonus;
 
-        if (materialChanged)
-            currentColor = Color.Lerp(currentColor, absorbable.Tint, 0.55f);
+            stretchMultiplierBonus += absorbable.StretchMultiplierBonus;
+        }
+
+        if (absorbable.GrantedAbility != SlimeAbsorbAbility.None)
+            ActivateAbsorbAbility(absorbable.GrantedAbility, abilityDuration);
 
         currentHealth = Mathf.Min(maxHealth, currentHealth + absorbable.VolumeGain * 0.25f);
 
         ApplyColor(currentColor);
         RefreshSplitPieceColors();
         RefreshShapeTarget();
+        PlayAbsorbFeedback(absorbable.Tint);
         PlayPickSound();
+        Heartwell.UI.InGameOverlayUI.ShowAbsorbPopup(absorbable);
         return true;
     }
 
-    private void AddVolume(float volumeGain)
+    public bool HasActiveAbsorbAbility(SlimeAbsorbAbility ability)
+    {
+        if (ability == SlimeAbsorbAbility.None)
+            return false;
+
+        return activeAbsorbAbility == ability
+            && activeAbsorbAbilityExpireTime > Time.time;
+    }
+
+    public bool TryGetActiveTimedAbilityStatus(out string displayName, out float normalizedTime, out float remainingTime, out Color barColor)
+    {
+        displayName = string.Empty;
+        normalizedTime = 0f;
+        remainingTime = 0f;
+        barColor = currentColor;
+
+        bool hasMaterial = timedMaterialAbility != SlimeMaterialType.Neutral && materialAbilityExpireTime > Time.time;
+        bool hasAbility = activeAbsorbAbility != SlimeAbsorbAbility.None && activeAbsorbAbilityExpireTime > Time.time;
+        if (!hasMaterial && !hasAbility)
+            return false;
+
+        float materialRemaining = hasMaterial ? materialAbilityExpireTime - Time.time : float.PositiveInfinity;
+        float abilityRemaining = hasAbility ? activeAbsorbAbilityExpireTime - Time.time : float.PositiveInfinity;
+        if (abilityRemaining <= materialRemaining)
+        {
+            displayName = GetAbsorbAbilityDisplayName(activeAbsorbAbility);
+            remainingTime = Mathf.Max(0f, abilityRemaining);
+            normalizedTime = activeAbsorbAbilityDuration > 0.001f
+                ? Mathf.Clamp01(remainingTime / activeAbsorbAbilityDuration)
+                : 0f;
+            barColor = new Color(0.38f, 1f, 0.55f, 1f);
+            return true;
+        }
+
+        displayName = timedMaterialAbility.ToString();
+        remainingTime = Mathf.Max(0f, materialRemaining);
+        normalizedTime = materialAbilityDuration > 0.001f
+            ? Mathf.Clamp01(remainingTime / materialAbilityDuration)
+            : 0f;
+        barColor = currentColor;
+        return true;
+    }
+
+    private float ResolveAbsorbAbilityDuration(SlimeAbsorbable absorbable)
+    {
+        float duration = absorbable != null ? absorbable.AbilityDuration : 0f;
+        return duration > 0.001f ? duration : Mathf.Max(0.001f, defaultAbsorbAbilityDuration);
+    }
+
+    private void ActivateMaterialAbility(SlimeAbsorbable absorbable, SlimeMaterialType material, float duration)
+    {
+        bool materialChanged = material != CurrentMaterial;
+        timedMaterialAbility = material;
+        materialAbilityDuration = Mathf.Max(0.001f, duration);
+        materialAbilityExpireTime = Time.time + materialAbilityDuration;
+        timedPressureResistanceBonus = absorbAddsPressureBonus && absorbable != null ? absorbable.PressureResistanceBonus : 0f;
+        timedStretchMultiplierBonus = absorbable != null ? absorbable.StretchMultiplierBonus : 0f;
+        CurrentMaterial = material;
+
+        if (materialChanged && absorbable != null)
+            currentColor = Color.Lerp(currentColor, absorbable.Tint, 0.55f);
+    }
+
+    private void ActivateAbsorbAbility(SlimeAbsorbAbility ability, float duration)
+    {
+        if (ability == SlimeAbsorbAbility.None)
+            return;
+
+        activeAbsorbAbility = ability;
+        activeAbsorbAbilityDuration = Mathf.Max(0.001f, duration);
+        activeAbsorbAbilityExpireTime = Time.time + activeAbsorbAbilityDuration;
+    }
+
+    private void UpdateTimedAbsorbAbilities()
+    {
+        bool shapeChanged = false;
+
+        if (timedMaterialAbility != SlimeMaterialType.Neutral && materialAbilityExpireTime <= Time.time)
+        {
+            ExpireMaterialAbility();
+            shapeChanged = true;
+        }
+
+        if (activeAbsorbAbility != SlimeAbsorbAbility.None && activeAbsorbAbilityExpireTime <= Time.time)
+            ExpireAbsorbAbility();
+
+        if (shapeChanged)
+            RefreshShapeTarget();
+    }
+
+    private void ExpireMaterialAbility()
+    {
+        if (CurrentMaterial == timedMaterialAbility)
+        {
+            CurrentMaterial = SlimeMaterialType.Neutral;
+            currentColor = neutralColor;
+            ApplyColor(currentColor);
+            RefreshSplitPieceColors();
+        }
+
+        timedMaterialAbility = SlimeMaterialType.Neutral;
+        materialAbilityExpireTime = -1f;
+        materialAbilityDuration = 0f;
+        timedPressureResistanceBonus = 0f;
+        timedStretchMultiplierBonus = 0f;
+    }
+
+    private void ExpireAbsorbAbility()
+    {
+        activeAbsorbAbility = SlimeAbsorbAbility.None;
+        activeAbsorbAbilityExpireTime = -1f;
+        activeAbsorbAbilityDuration = 0f;
+    }
+
+    private static string GetAbsorbAbilityDisplayName(SlimeAbsorbAbility ability)
+    {
+        return ability == SlimeAbsorbAbility.WaveAttack ? "Slime Wave" : ability.ToString();
+    }
+
+    private void AddVolume(float volumeGain, bool syncMass = false)
     {
         float gainedVolume = currentVolume + Mathf.Max(0f, volumeGain);
         currentVolume = maxVolume > 0f
             ? Mathf.Clamp(gainedVolume, minBodyVolume, maxVolume)
             : Mathf.Max(minBodyVolume, gainedVolume);
+
+        if (syncMass)
+            SyncBodyMassWithVolume();
     }
 
-    private void AbsorbSplitPieceVolume(SlimeSplitPiece piece)
+    public void AbsorbMergedSplitVolume(float volumeGain)
     {
-        if (piece != null)
-            AddVolume(piece.Volume);
+        AddVolume(volumeGain);
+        RefreshShapeTarget();
+        DampenMergeTransitionMomentum();
+    }
+
+    public void RestoreBaseVolume(bool restoreHealth)
+    {
+        RestoreVolumeToAtLeast(baseVolume, restoreHealth);
+    }
+
+    public void RestoreVolumeToAtLeast(float targetVolume, bool restoreHealth)
+    {
+        if (isCrushed)
+            return;
+
+        float volumeFloor = Mathf.Max(minBodyVolume, targetVolume);
+        if (maxVolume > 0f)
+            volumeFloor = Mathf.Clamp(volumeFloor, minBodyVolume, maxVolume);
+
+        bool volumeChanged = currentVolume < volumeFloor;
+        if (volumeChanged)
+        {
+            currentVolume = volumeFloor;
+            SyncBodyMassWithVolume();
+            RefreshShapeTarget();
+        }
+
+        if (restoreHealth)
+            currentHealth = Mathf.Max(0f, maxHealth);
     }
 
     private float GetSplitPieceScale(float pieceVolume)
     {
-        return Mathf.Max(0.05f, GetVolumeRadiusScale(pieceVolume) * Mathf.Max(0.01f, splitPieceScale));
+        return Mathf.Max(0.05f, GetSplitViewScale(pieceVolume) * Mathf.Max(0.01f, splitPieceScale));
     }
 
     public bool TryAbsorbNearbySlime(Vector3 center, float radius)
@@ -814,15 +950,36 @@ public class SlimePlayerAbilities : MonoBehaviour
             return;
 
         currentHealth = Mathf.Max(0f, currentHealth - amount);
+        float health01 = maxHealth > 0.001f ? currentHealth / maxHealth : 0f;
+        Heartwell.UI.InGameOverlayUI.ShowHazard(health01);
 
         if (currentHealth <= 0f)
             OnCrushed();
     }
 
-    public void ReleaseBridgeVolume(float volume)
+    public void ApplyHitDamage(float damageAmount, float volumeLossAmount)
     {
-        reservedBridgeVolume = Mathf.Max(0f, reservedBridgeVolume - Mathf.Max(0f, volume));
-        activeBridgeCount = Mathf.Max(0, activeBridgeCount - 1);
+        if (currentHealth <= 0f)
+            return;
+
+        ApplyHazardDamage(damageAmount);
+
+        if (isCrushed)
+            return;
+
+        if (hitDamageReducesVolume)
+            ReduceVolumeFromHit(volumeLossAmount);
+    }
+
+    private void ReduceVolumeFromHit(float volumeLossAmount)
+    {
+        float loss = Mathf.Max(0f, volumeLossAmount);
+        if (loss <= 0f || currentVolume <= minBodyVolume)
+            return;
+
+        currentVolume = Mathf.Max(minBodyVolume, currentVolume - loss);
+        RefreshShapeTarget();
+        SyncBodyMassWithVolume();
     }
 
     private float GetCarryCapacity()
@@ -840,30 +997,6 @@ public class SlimePlayerAbilities : MonoBehaviour
             return false;
 
         return carriedVolume + itemVolume <= GetCarryCapacity() + 0.0001f;
-    }
-
-    private bool WouldOverloadCarriedItemsAfterBridgeReserve(float additionalReservedVolume)
-    {
-        PruneCarriedItems();
-
-        if (carriedItems.Count == 0)
-            return false;
-
-        float projectedBodyVolume = Mathf.Max(minBodyVolume, currentVolume - reservedBridgeVolume - Mathf.Max(0f, additionalReservedVolume));
-        float projectedCapacity = Mathf.Max(0f, projectedBodyVolume * carryCapacityVolumeRatio);
-        float projectedSingleItemLimit = Mathf.Max(0f, projectedBodyVolume * maxSingleCarryVolumeRatio);
-
-        if (carriedVolume > projectedCapacity + 0.0001f)
-            return true;
-
-        for (int i = 0; i < carriedItems.Count; i++)
-        {
-            CarriedItemState state = carriedItems[i];
-            if (state != null && state.Volume > projectedSingleItemLimit + 0.0001f)
-                return true;
-        }
-
-        return false;
     }
 
     private Transform GetOrCreateCarryContainer()
@@ -1053,13 +1186,13 @@ public class SlimePlayerAbilities : MonoBehaviour
                     TryAbsorbNearbySlime(GetBodyCenterPosition());
                 }
             }
-            else if (isMerged)
-            {
-                ReturnToNormalForm();
-            }
             else if (TryAbsorbNearbySlime(GetBodyCenterPosition()))
             {
                 return;
+            }
+            else if (isMerged)
+            {
+                ReturnToNormalForm();
             }
         }
 
@@ -1069,9 +1202,6 @@ public class SlimePlayerAbilities : MonoBehaviour
 
         if (!stretchPressed && isStretching)
             EndStretch();
-
-        if (IsKeyDown(bridgeKey))
-            BuildBridge(lastAimDirection);
 
         if (IsKeyDown(carryKey) && !TryCarryNearestItem())
             ReleaseLastCarriedItem();
@@ -1253,7 +1383,44 @@ public class SlimePlayerAbilities : MonoBehaviour
         CacheStretchBone(3, boneSphere.y2);
         CacheStretchBone(4, boneSphere.z);
         CacheStretchBone(5, boneSphere.z2);
+        CacheBodyMass();
         return true;
+    }
+
+    private void CacheBodyMass()
+    {
+        if (stretchRootBody != null && baseBodyMass <= 0f)
+            baseBodyMass = Mathf.Max(0.0001f, stretchRootBody.mass);
+        else if (bodyRigidbody != null && baseBodyMass <= 0f)
+            baseBodyMass = Mathf.Max(0.0001f, bodyRigidbody.mass);
+    }
+
+    private void SyncBodyMassWithVolume()
+    {
+        if (!hitDamageScalesMass)
+            return;
+
+        float massScale = Mathf.Max(0.05f, currentVolume / Mathf.Max(baseVolume, 0.001f));
+
+        if (ResolveBodyRigidbody())
+        {
+            if (baseBodyMass <= 0f)
+                baseBodyMass = Mathf.Max(0.0001f, bodyRigidbody.mass);
+
+            bodyRigidbody.mass = Mathf.Max(0.0001f, baseBodyMass * massScale);
+        }
+
+        if (!TryCacheStretchBones())
+            return;
+
+        for (int i = 0; i < stretchBoneBodies.Length; i++)
+        {
+            Rigidbody boneBody = stretchBoneBodies[i];
+            if (boneBody == null || stretchBoneBaseMasses[i] <= 0f)
+                continue;
+
+            boneBody.mass = Mathf.Max(0.0001f, stretchBoneBaseMasses[i] * massScale);
+        }
     }
 
     private void CacheStretchBone(int index, GameObject boneObject)
@@ -1264,6 +1431,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         stretchBoneBaseConnectedAnchors[index] = Vector3.zero;
         stretchBoneBaseSprings[index] = 0f;
         stretchBoneBaseDampers[index] = 0f;
+        stretchBoneBaseMasses[index] = 0f;
         stretchBoneBaseAutoConfigureAnchors[index] = false;
 
         if (boneObject == null)
@@ -1274,6 +1442,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             return;
 
         stretchBoneBodies[index] = boneBody;
+        stretchBoneBaseMasses[index] = Mathf.Max(0.0001f, boneBody.mass);
         stretchBoneBaseLocalOffsets[index] = transform.InverseTransformDirection(boneBody.worldCenterOfMass - stretchRootBody.worldCenterOfMass);
 
         SpringJoint springJoint = boneObject.GetComponent<SpringJoint>();
@@ -1308,7 +1477,7 @@ public class SlimePlayerAbilities : MonoBehaviour
     private Vector3 GetStretchShape()
     {
         float volumeScale = GetVolumeScale();
-        float stretch = stretchLength + stretchMultiplierBonus;
+        float stretch = stretchLength + TotalStretchMultiplierBonus;
         return new Vector3(stretchThickness, stretchThickness, stretch) * volumeScale;
     }
 
@@ -1325,6 +1494,12 @@ public class SlimePlayerAbilities : MonoBehaviour
     private float GetVolumeRadiusScale(float volume)
     {
         return Mathf.Pow(Mathf.Max(volume, minBodyVolume) / Mathf.Max(baseVolume, 0.001f), 1f / 3f);
+    }
+
+    private float GetSplitViewScale(float volume)
+    {
+        float normalizedVolume = Mathf.Max(0.0001f, volume) / Mathf.Max(baseVolume, 0.001f);
+        return Mathf.Sqrt(normalizedVolume);
     }
 
     private Quaternion GetStretchTargetRotation()
@@ -1351,14 +1526,14 @@ public class SlimePlayerAbilities : MonoBehaviour
         {
             if (!stretchSoftbodyBones || !TryCacheStretchBones())
             {
-                float stretch = stretchLength + stretchMultiplierBonus;
+                float stretch = stretchLength + TotalStretchMultiplierBonus;
                 shape = new Vector3(stretchThickness, stretchThickness, stretch) * volumeScale;
                 RotateTowardAim();
             }
         }
         else if (isSplit)
         {
-            shape *= splitScale;
+            shape = Vector3.one * GetSplitViewScale(BodyVolume) * splitScale;
         }
         else if (isMerged)
         {
@@ -1379,7 +1554,10 @@ public class SlimePlayerAbilities : MonoBehaviour
         float lerp = Mathf.Clamp01(Time.deltaTime * shapeLerpSpeed);
 
         if (bodyRoot != null)
-            bodyRoot.localScale = Vector3.Lerp(bodyRoot.localScale, targetLocalScale, lerp);
+        {
+            Vector3 feedbackScale = Vector3.Scale(targetLocalScale, absorbFeedbackShape) * absorbFeedbackScale;
+            bodyRoot.localScale = Vector3.Lerp(bodyRoot.localScale, feedbackScale, lerp);
+        }
     }
 
     private void RefreshShapeImmediate()
@@ -1440,6 +1618,80 @@ public class SlimePlayerAbilities : MonoBehaviour
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * stretchTurnSpeed);
     }
 
+    private Vector3 BuildSplitLaunchVelocity(Vector3 splitDirection, float speedMultiplier, float upwardMultiplier)
+    {
+        Vector3 planarDirection = splitDirection;
+        planarDirection.y = 0f;
+
+        if (planarDirection.sqrMagnitude <= 0.0001f)
+            planarDirection = lastAimDirection.sqrMagnitude > 0.0001f ? lastAimDirection : transform.forward;
+
+        planarDirection.y = 0f;
+        if (planarDirection.sqrMagnitude <= 0.0001f)
+            planarDirection = Vector3.forward;
+
+        planarDirection.Normalize();
+
+        float launchScale = Mathf.Clamp01(splitLaunchVelocityScale);
+        float planarSpeed = splitLaunchSpeed * Mathf.Max(0f, speedMultiplier) * launchScale;
+        if (maxSplitLaunchPlanarSpeed > 0f)
+            planarSpeed = Mathf.Min(planarSpeed, maxSplitLaunchPlanarSpeed);
+
+        float upwardSpeed = splitLaunchUpward * Mathf.Max(0f, upwardMultiplier) * launchScale;
+        if (maxSplitLaunchUpwardSpeed > 0f)
+            upwardSpeed = Mathf.Min(upwardSpeed, maxSplitLaunchUpwardSpeed);
+
+        return planarDirection * planarSpeed + Vector3.up * upwardSpeed;
+    }
+
+    private void DampenSplitTransitionMomentum()
+    {
+        DampenTransitionMomentum(splitTransitionVelocityRetain);
+    }
+
+    private void DampenMergeTransitionMomentum()
+    {
+        DampenTransitionMomentum(mergeTransitionVelocityRetain);
+    }
+
+    private void DampenTransitionMomentum(float velocityRetain)
+    {
+        float retain = Mathf.Clamp01(velocityRetain);
+
+        if (ResolveBodyRigidbody())
+            DampenRigidbodyMomentum(bodyRigidbody, retain);
+
+        if (!TryCacheStretchBones())
+            return;
+
+        for (int i = 0; i < stretchBoneBodies.Length; i++)
+        {
+            Rigidbody boneBody = stretchBoneBodies[i];
+            if (boneBody == null || boneBody == bodyRigidbody)
+                continue;
+
+            DampenRigidbodyMomentum(boneBody, retain);
+        }
+    }
+
+    private void DampenRigidbodyMomentum(Rigidbody targetBody, float velocityRetain)
+    {
+        if (targetBody == null || targetBody.isKinematic)
+            return;
+
+        Vector3 velocity = targetBody.velocity * velocityRetain;
+        Vector3 planarVelocity = new Vector3(velocity.x, 0f, velocity.z);
+        if (maxTransitionPlanarSpeed > 0f)
+            planarVelocity = Vector3.ClampMagnitude(planarVelocity, maxTransitionPlanarSpeed);
+
+        float verticalVelocity = velocity.y;
+        if (maxTransitionUpwardSpeed > 0f && verticalVelocity > maxTransitionUpwardSpeed)
+            verticalVelocity = maxTransitionUpwardSpeed;
+
+        targetBody.velocity = planarVelocity + Vector3.up * verticalVelocity;
+        targetBody.angularVelocity *= Mathf.Clamp01(transitionAngularVelocityRetain);
+    }
+
     private bool SpawnSplitPieces()
     {
         for (int i = splitPieces.Count - 1; i >= 0; i--)
@@ -1459,7 +1711,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             return false;
 
         float pieceVolume = totalSplitVolume / count;
-        if (pieceVolume <= 0f)
+        if (pieceVolume < minSplitPieceVolume)
             return false;
 
         currentVolume = Mathf.Max(minBodyVolume, currentVolume - totalSplitVolume);
@@ -1496,8 +1748,7 @@ public class SlimePlayerAbilities : MonoBehaviour
             if (splitPiece == null)
                 splitPiece = piece.AddComponent<SlimeSplitPiece>();
 
-            Vector3 launchVelocity = splitDirection * (splitLaunchSpeed * speedJitter)
-                                     + Vector3.up * splitLaunchUpward;
+            Vector3 launchVelocity = BuildSplitLaunchVelocity(splitDirection, speedJitter, 1f);
 
             splitPiece.Init(
                 this,
@@ -1521,7 +1772,6 @@ public class SlimePlayerAbilities : MonoBehaviour
         {
             if (splitPieces[i] != null)
             {
-                AbsorbSplitPieceVolume(splitPieces[i]);
                 splitPieces[i].BeginMerge(splitMergeDuration);
             }
         }
@@ -1540,7 +1790,6 @@ public class SlimePlayerAbilities : MonoBehaviour
                     Destroy(splitPieces[i].gameObject);
                 else
                 {
-                    AbsorbSplitPieceVolume(splitPieces[i]);
                     splitPieces[i].BeginMerge(splitMergeDuration);
                 }
             }
@@ -1598,18 +1847,12 @@ public class SlimePlayerAbilities : MonoBehaviour
                 splitPieceMergeKey,
                 splitPieceStretchKey,
                 splitPieceAlternateStretchKey,
-                splitPieceBridgeKey,
                 splitPieceCarryKey);
             controlledSplitPiece.SetAbilityTuning(
                 stretchLength,
                 stretchThickness,
                 shapeLerpSpeed,
                 stretchTurnSpeed,
-                bridgeLength,
-                bridgeWidth,
-                bridgeThickness,
-                bridgeDuration,
-                bridgeYOffset,
                 carryPickupRadius,
                 carryMask,
                 carryLocalOffset,
@@ -1661,14 +1904,192 @@ public class SlimePlayerAbilities : MonoBehaviour
             ApplyColor(slimeRenderer, color);
     }
 
+    private void PlayAbsorbFeedback(Color absorbedTint)
+    {
+        if (!isActiveAndEnabled || absorbPulseDuration <= 0f)
+            return;
+
+        if (absorbFeedbackCoroutine != null)
+            StopCoroutine(absorbFeedbackCoroutine);
+
+        absorbFeedbackCoroutine = StartCoroutine(PlayAbsorbFeedbackRoutine(absorbedTint));
+    }
+
+    private IEnumerator PlayAbsorbFeedbackRoutine(Color absorbedTint)
+    {
+        float duration = Mathf.Max(0.01f, absorbPulseDuration);
+        float pulseAmount = Mathf.Max(0f, absorbPulseScale - 1f);
+        float squashAmount = Mathf.Max(0f, absorbSquashAmount);
+        Color flashColor = Color.Lerp(absorbedTint, Color.white, 0.55f);
+        float elapsed = 0f;
+        ShowAbsorbRing(false);
+
+        while (elapsed < duration)
+        {
+            float normalizedTime = Mathf.Clamp01(elapsed / duration);
+            float pulse = Mathf.Sin(normalizedTime * Mathf.PI);
+            float flashPulse = Mathf.Sin(normalizedTime * Mathf.PI * 2f);
+            float flashAmount = Mathf.Clamp01(absorbFlashStrength * Mathf.Max(pulse, 0.45f + 0.55f * Mathf.Abs(flashPulse)));
+            Color feedbackColor = Color.Lerp(currentColor, flashColor, flashAmount);
+            Color glowColor = flashColor * Mathf.Max(0f, absorbGlowIntensity) * pulse;
+
+            absorbFeedbackScale = 1f + pulseAmount * pulse;
+            absorbFeedbackShape = new Vector3(
+                1f + squashAmount * pulse,
+                Mathf.Max(0.1f, 1f - squashAmount * 0.55f * pulse),
+                1f + squashAmount * pulse);
+            ApplyFeedbackColor(feedbackColor, glowColor);
+            UpdateAbsorbRing(normalizedTime, pulse, flashColor);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        absorbFeedbackScale = 1f;
+        absorbFeedbackShape = Vector3.one;
+        ApplyFeedbackColor(currentColor, Color.black);
+        ShowAbsorbRing(false);
+        absorbFeedbackCoroutine = null;
+    }
+
+    private void ResetAbsorbFeedback()
+    {
+        if (absorbFeedbackCoroutine != null)
+        {
+            StopCoroutine(absorbFeedbackCoroutine);
+            absorbFeedbackCoroutine = null;
+        }
+
+        absorbFeedbackScale = 1f;
+        absorbFeedbackShape = Vector3.one;
+        ApplyFeedbackColor(currentColor, Color.black);
+        ShowAbsorbRing(false);
+    }
+
+    private void UpdateAbsorbRing(float normalizedTime, float pulse, Color color)
+    {
+        if (!absorbRingEnabled)
+            return;
+
+        EnsureAbsorbRing();
+        if (absorbRingRenderer == null)
+            return;
+
+        float easedTime = 1f - Mathf.Pow(1f - Mathf.Clamp01(normalizedTime), 3f);
+        float radius = Mathf.Lerp(Mathf.Max(0.01f, absorbRingStartRadius), Mathf.Max(absorbRingStartRadius, absorbRingEndRadius), easedTime);
+        float alpha = Mathf.Clamp01((1f - normalizedTime) * 0.95f + pulse * 0.25f);
+        Color ringColor = color;
+        ringColor.a = alpha;
+
+        absorbRingRenderer.enabled = true;
+        absorbRingRenderer.startColor = ringColor;
+        absorbRingRenderer.endColor = new Color(ringColor.r, ringColor.g, ringColor.b, alpha * 0.35f);
+        absorbRingRenderer.widthMultiplier = Mathf.Max(0.01f, absorbRingWidth) * (1f + pulse * 0.85f);
+        ApplyAbsorbRingMaterialColor(ringColor, color * Mathf.Max(0f, absorbGlowIntensity));
+
+        Vector3 center = GetBodyCenterPosition() + Vector3.up * absorbRingYOffset;
+        for (int i = 0; i < AbsorbRingSegments; i++)
+        {
+            float angle = (Mathf.PI * 2f * i) / AbsorbRingSegments;
+            Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+            absorbRingRenderer.SetPosition(i, center + offset);
+        }
+    }
+
+    private void ShowAbsorbRing(bool visible)
+    {
+        if (absorbRingRenderer != null)
+            absorbRingRenderer.enabled = visible;
+    }
+
+    private void EnsureAbsorbRing()
+    {
+        if (absorbRingRenderer != null)
+            return;
+
+        GameObject ringObject = new GameObject("Absorb Feedback Ring");
+        ringObject.transform.SetParent(transform, false);
+
+        absorbRingRenderer = ringObject.AddComponent<LineRenderer>();
+        absorbRingRenderer.useWorldSpace = true;
+        absorbRingRenderer.loop = true;
+        absorbRingRenderer.positionCount = AbsorbRingSegments;
+        absorbRingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        absorbRingRenderer.receiveShadows = false;
+        absorbRingRenderer.enabled = false;
+
+        Shader ringShader = Shader.Find("HDRP/Unlit");
+        if (ringShader == null)
+            ringShader = Shader.Find("Sprites/Default");
+        if (ringShader == null)
+            ringShader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (ringShader == null)
+            ringShader = Shader.Find("Unlit/Color");
+
+        if (ringShader != null)
+        {
+            absorbRingMaterial = new Material(ringShader)
+            {
+                name = "Absorb Feedback Ring",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            absorbRingRenderer.sharedMaterial = absorbRingMaterial;
+        }
+    }
+
+    private void ApplyAbsorbRingMaterialColor(Color color, Color emission)
+    {
+        if (absorbRingMaterial == null)
+            return;
+
+        absorbRingMaterial.SetColor(BaseColor, color);
+        absorbRingMaterial.SetColor(ColorId, color);
+        absorbRingMaterial.SetColor(EmissionColor, emission);
+        absorbRingMaterial.SetColor(EmissiveColor, emission);
+    }
+
+    private void DestroyAbsorbRing()
+    {
+        if (absorbRingRenderer != null)
+        {
+            Destroy(absorbRingRenderer.gameObject);
+            absorbRingRenderer = null;
+        }
+
+        if (absorbRingMaterial != null)
+        {
+            Destroy(absorbRingMaterial);
+            absorbRingMaterial = null;
+        }
+    }
+
+    private void ApplyFeedbackColor(Color color, Color emission)
+    {
+        if (slimeRenderer != null)
+            ApplyColor(slimeRenderer, color, true, emission);
+    }
+
     private void ApplyColor(Renderer targetRenderer, Color color)
+    {
+        ApplyColor(targetRenderer, color, false, Color.black);
+    }
+
+    private void ApplyColor(Renderer targetRenderer, Color color, bool includeEmission, Color emission)
     {
         if (targetRenderer == null)
             return;
 
         EnsurePropertyBlock();
+        propertyBlock.Clear();
         propertyBlock.SetColor(BaseColor, color);
         propertyBlock.SetColor(ColorId, color);
+
+        if (includeEmission)
+        {
+            propertyBlock.SetColor(EmissionColor, emission);
+            propertyBlock.SetColor(EmissiveColor, emission);
+        }
+
         targetRenderer.SetPropertyBlock(propertyBlock);
     }
 
@@ -1706,6 +2127,9 @@ public class SlimePlayerAbilities : MonoBehaviour
 
         if (ResolveBodyRigidbody())
             bodyRigidbody.velocity *= 0.25f;
+
+        Heartwell.UI.InGameOverlayUI.ShowRespawn();
+        SceneRespawnManager.RespawnCurrentScene();
     }
 
     private void ResolveReferences()
@@ -1728,7 +2152,10 @@ public class SlimePlayerAbilities : MonoBehaviour
     private bool ResolveBodyRigidbody()
     {
         if (bodyRigidbody != null)
+        {
+            CacheBodyMass();
             return true;
+        }
 
         if (boneSphere == null)
             boneSphere = GetComponent<BoneSphere>();
@@ -1748,6 +2175,7 @@ public class SlimePlayerAbilities : MonoBehaviour
         if (bodyRigidbody == null)
             bodyRigidbody = GetComponentInChildren<Rigidbody>();
 
+        CacheBodyMass();
         return bodyRigidbody != null;
     }
 

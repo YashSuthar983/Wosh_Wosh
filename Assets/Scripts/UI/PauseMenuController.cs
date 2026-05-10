@@ -49,6 +49,7 @@ public class PauseMenuController : MonoBehaviour
         }
 
         InitializeButtons();
+        ApplyGeneratedPausePanelArt();
     }
 
     private Canvas GetTargetCanvas()
@@ -218,10 +219,39 @@ public class PauseMenuController : MonoBehaviour
         return button;
     }
 
+    private void ApplyGeneratedPausePanelArt()
+    {
+        if (pauseMenuPanel == null)
+            return;
+
+        Texture2D texture = Resources.Load<Texture2D>("UI/InGameGenerated/12_pause_panel");
+        if (texture == null)
+            return;
+
+        Image image = pauseMenuPanel.GetComponent<Image>();
+        if (image == null)
+            image = pauseMenuPanel.AddComponent<Image>();
+
+        image.sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
+        image.color = Color.white;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+    }
+
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            if (Heartwell.UI.InGameOverlayUI.IsOptionsShellVisible)
+            {
+                Heartwell.UI.InGameOverlayUI.DismissOptionsShell();
+                return;
+            }
+
             if (isPaused)
                 Resume();
             else
@@ -307,6 +337,7 @@ public class PauseMenuController : MonoBehaviour
 
     public void OpenOptions()
     {
+        Heartwell.UI.InGameOverlayUI.ShowOptionsShell();
     }
 
     public void ExitToMainMenu()

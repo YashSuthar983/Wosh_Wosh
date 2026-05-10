@@ -661,8 +661,7 @@ MonoBehaviour:
   volumeGain: 1
   pressureResistanceBonus: 0.25
   stretchMultiplierBonus: 0
-  bridgeDurationBonus: 0
-  autoMergeOnContact: 1
+  autoMergeOnContact: 0
   destroyOnAbsorb: 1
   createPickupTriggerWhenMissing: 1
   fallbackPickupTriggerRadius: 0.5
@@ -1729,7 +1728,6 @@ MonoBehaviour:
   splitSpeedMultiplier: 1.15
   mergedSpeedMultiplier: 1
   stretchSpeedMultiplier: 0.65
-  bridgeSpeedMultiplier: 0.85
   fullCarrySpeedMultiplier: 0.78
   movementLoopClip: {fileID: 8300000, guid: 5e526492f5ce4eaf2a3864cf94001865,
     type: 3}
@@ -1797,7 +1795,6 @@ MonoBehaviour:
   bodyRigidbody: {fileID: 0}
   splitPiecePrefab: {fileID: 4838354347015398771, guid: b4a750580e16e66f6bed5cfad8bf0ff8,
     type: 3}
-  bridgePrefab: {fileID: 0}
   readKeyboardInput: 1
   cameraTransform: {fileID: 0}
   cameraRelativeAim: 1
@@ -1809,7 +1806,6 @@ MonoBehaviour:
   mergeKey: 101
   stretchKey: 304
   alternateStretchKey: 303
-  bridgeKey: 102
   carryKey: 99
   controlLastSplitPieceWithArrowKeys: 1
   splitPieceCameraRelativeMovement: 1
@@ -1821,7 +1817,6 @@ MonoBehaviour:
   splitPieceMergeKey: 307
   splitPieceStretchKey: 303
   splitPieceAlternateStretchKey: 0
-  splitPieceBridgeKey: 13
   splitPieceCarryKey: 256
   splitPieceMaxSplitGeneration: 1
   splitPieceMoveSpeed: 3.8
@@ -1852,12 +1847,12 @@ MonoBehaviour:
   maxSplitPieces: 24
   splitVolumeFraction: 0.5
   minSplitPieceVolume: 0.05
-  splitScale: 0.62
-  splitPieceScale: 0.5
+  splitScale: 1
+  splitPieceScale: 1
   splitSpawnRadius: 0.35
   splitLaunchSpeed: 0.54
   splitLaunchUpward: 2.5
-  splitMergeDuration: 0
+  splitMergeDuration: 0.18
   splitMergeTouchRadius: 1.1
   stretchLength: 2.6
   stretchThickness: 0.55
@@ -1869,12 +1864,6 @@ MonoBehaviour:
   stretchRelaxedSpring: 18
   stretchRelaxedDamper: 12
   stretchReturnDuration: 0.25
-  bridgeLength: 3.4
-  bridgeWidth: 0.9
-  bridgeThickness: 0.22
-  bridgeDuration: 2.5
-  bridgeVolumeCost: 0.2
-  bridgeYOffset: 0.05
   carryContainer: {fileID: 0}
   keepCarryContainerAtBodyCenter: 1
   carryPickupRadius: 1.1
@@ -2391,8 +2380,7 @@ MonoBehaviour:
   volumeGain: 1
   pressureResistanceBonus: 0.25
   stretchMultiplierBonus: 0
-  bridgeDurationBonus: 0
-  autoMergeOnContact: 1
+  autoMergeOnContact: 0
   destroyOnAbsorb: 1
   createPickupTriggerWhenMissing: 1
   fallbackPickupTriggerRadius: 0.5

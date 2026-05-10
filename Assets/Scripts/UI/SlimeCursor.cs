@@ -11,7 +11,6 @@ namespace Heartwell.UI
     public class SlimeCursor : MonoBehaviour
     {
         [Header("Movement Settings")]
-        [SerializeField] private float followSpeed = 20f;
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float movementRotationThreshold = 5f;
         

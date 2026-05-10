@@ -26,7 +26,6 @@ namespace Heartwell.UI
         [SerializeField] private float movementScale = 1.1f;
 
         private int currentSlideIndex = 0;
-        private bool isTransitioning = false;
 
         private float startTime;
 
@@ -74,7 +73,6 @@ namespace Heartwell.UI
 
         private IEnumerator ShowSlide(Sprite slideSprite)
         {
-            isTransitioning = true;
             displayImage.sprite = slideSprite;
             
             // Reset transform for Ken Burns effect
@@ -119,7 +117,6 @@ namespace Heartwell.UI
                 yield return null;
             }
             canvasGroup.alpha = 0f;
-            isTransitioning = false;
         }
 
         private void ApplyKenBurnsEffect(float normalizedTime)

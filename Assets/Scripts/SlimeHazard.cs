@@ -6,7 +6,6 @@ public class SlimeHazard : MonoBehaviour
 {
     [SerializeField] private float damagePerSecond = 0.35f;
     [SerializeField] private bool stretchCanCross = true;
-    [SerializeField] private bool bridgeBlocksHazard = true;
     [SerializeField] private SlimeMaterialType immuneMaterial = SlimeMaterialType.Fireproof;
 
     private readonly HashSet<SlimePlayerAbilities> touchedThisFrame = new HashSet<SlimePlayerAbilities>();
@@ -25,14 +24,6 @@ public class SlimeHazard : MonoBehaviour
 
     private void OnCollisionStay(Collision collision)
     {
-        if (bridgeBlocksHazard && collision.collider.GetComponentInParent<SlimeBridgeSegment>() != null)
-        {
-            if (hazardCollider != null)
-                Physics.IgnoreCollision(collision.collider, hazardCollider, true);
-
-            return;
-        }
-
         DamageSlime(collision.collider);
     }
 

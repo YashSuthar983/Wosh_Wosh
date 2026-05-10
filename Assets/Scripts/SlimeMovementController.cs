@@ -86,7 +86,6 @@ public class SlimeMovementController : MonoBehaviour
     [SerializeField] private float splitSpeedMultiplier = 1.15f;
     [SerializeField] private float mergedSpeedMultiplier = 1f;
     [SerializeField] private float stretchSpeedMultiplier = 0.85f;
-    [SerializeField] private float bridgeSpeedMultiplier = 0.85f;
     [SerializeField, Range(0.1f, 1f)] private float fullCarrySpeedMultiplier = 0.78f;
 
     [Header("Movement Audio")]
@@ -1259,9 +1258,6 @@ public class SlimeMovementController : MonoBehaviour
 
         if (abilities.IsStretching)
             multiplier *= stretchSpeedMultiplier;
-
-        if (abilities.IsBridging)
-            multiplier *= bridgeSpeedMultiplier;
 
         if (abilities.CarryLoad01 > 0f)
             multiplier *= Mathf.Lerp(1f, fullCarrySpeedMultiplier, abilities.CarryLoad01);

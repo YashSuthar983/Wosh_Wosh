@@ -173,13 +173,25 @@ MonoBehaviour:
   volumeGain: 1
   pressureResistanceBonus: 0
   stretchMultiplierBonus: 0
-  bridgeDurationBonus: 0
-  autoMergeOnContact: 1
+  grantedAbility: 0
+  abilityDuration: 15
+  autoMergeOnContact: 0
   destroyOnAbsorb: 1
   createPickupTriggerWhenMissing: 1
   fallbackPickupTriggerRadius: 0.5
   listenOnChildColliders: 1
   childColliderRefreshFrames: 12
+  visualKind: 0
+  replaceExistingVisuals: 1
+  visualLocalOffset: {x: 0, y: 0, z: 0}
+  visualLocalEulerAngles: {x: 0, y: 0, z: 0}
+  visualLocalScale: {x: 1, y: 1, z: 1}
+  normalizeVisualBounds: 1
+  visualTargetSize: 1.25
+  animateVisual: 1
+  visualBobAmplitude: 0.08
+  visualBobSpeed: 1.8
+  visualSpinSpeed: 35
 --- !u!1 &7610005465996150803 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4609898484582716255, guid: 64d461f937bc7fa5684ca02e129e5031,
