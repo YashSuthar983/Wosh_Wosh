@@ -17,6 +17,7 @@ public class EnemyEncounterRuntimeDirector : MonoBehaviour
     [SerializeField, Min(0f)] private float triggerScanPadding = 0.75f;
 
     [Header("Clear View Camera")]
+    [SerializeField] private bool useClearViewCamera = true;
     [SerializeField] private CinemachineVirtualCamera clearViewCamera = null;
     [SerializeField] private string clearViewCameraName = "Enemy Arena Clear View Camera";
     [SerializeField] private Vector3 clearViewCameraPosition = new Vector3(15f, 22f, 23f);
@@ -37,7 +38,6 @@ public class EnemyEncounterRuntimeDirector : MonoBehaviour
 
     private int playerOverlapCount;
     private bool encounterStarted;
-    private bool cameraActive;
     private bool clearRecoveryApplied;
     private SlimePlayerAbilities cachedPlayer;
     private readonly Collider[] scanHits = new Collider[32];
@@ -49,7 +49,8 @@ public class EnemyEncounterRuntimeDirector : MonoBehaviour
     {
         ResolveReferences();
         EnsureTriggerCollider();
-        EnsureClearViewCamera();
+        if (useClearViewCamera)
+            EnsureClearViewCamera();
         DeactivateClearViewCamera();
     }
 
@@ -133,22 +134,26 @@ public class EnemyEncounterRuntimeDirector : MonoBehaviour
 
     private void ActivateClearViewCamera()
     {
+        if (!useClearViewCamera)
+        {
+            DeactivateClearViewCamera();
+            return;
+        }
+
         EnsureClearViewCamera();
         if (clearViewCamera == null || EncounterCleared())
             return;
 
         ApplyClearViewPose();
         clearViewCamera.Priority = clearViewCameraPriority;
-        cameraActive = true;
     }
 
     private void DeactivateClearViewCamera()
     {
-        if (!cameraActive || clearViewCamera == null)
+        if (clearViewCamera == null)
             return;
 
         clearViewCamera.Priority = inactiveCameraPriority;
-        cameraActive = false;
     }
 
     private void EnsureClearViewCamera()

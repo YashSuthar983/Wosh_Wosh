@@ -75,35 +75,35 @@ namespace Heartwell.UI
             InGameOverlayUI overlay = EnsureInstance();
             if (absorbable.GrantedAbility == global::SlimeAbsorbAbility.WaveAttack)
             {
-                overlay.EnqueueOnce("ability_wave", "02_wave_unlock", "A pulse stirs.", new Vector2(700f, 467f), new Vector2(0f, 140f), new Vector2(92f, -156f), new Vector2(420f, 76f));
+                overlay.EnqueueOnce("ability_wave", "02_wave_unlock", "A pulse stirs.", new Vector2(700f, 467f), new Vector2(0f, 140f), new Vector2(76f, -132f), new Vector2(510f, 66f));
                 return;
             }
 
             if (absorbable.MaterialType == global::SlimeMaterialType.Sticky)
             {
-                overlay.EnqueueOnce("material_sticky", "01_sticky_unlock", "The walls answer.", new Vector2(700f, 467f), new Vector2(0f, 140f), new Vector2(92f, -156f), new Vector2(420f, 76f));
+                overlay.EnqueueOnce("material_sticky", "01_sticky_unlock", "The walls answer.", new Vector2(700f, 467f), new Vector2(0f, 140f), new Vector2(76f, -132f), new Vector2(510f, 66f));
                 return;
             }
 
             if (absorbable.MaterialType != global::SlimeMaterialType.Neutral)
             {
-                overlay.EnqueueOnce("material_" + absorbable.MaterialType, "07_pickup_discovery", MaterialWhisper(absorbable.MaterialType), new Vector2(660f, 440f), new Vector2(0f, 136f), new Vector2(86f, -146f), new Vector2(410f, 72f));
+                overlay.EnqueueOnce("material_" + absorbable.MaterialType, "07_pickup_discovery", MaterialWhisper(absorbable.MaterialType), new Vector2(660f, 440f), new Vector2(0f, 136f), new Vector2(110f, -132f), new Vector2(470f, 58f));
                 return;
             }
 
-            overlay.EnqueueOnce("pickup_first", "07_pickup_discovery", "A quiet glow lingers.", new Vector2(660f, 440f), new Vector2(0f, 136f), new Vector2(86f, -146f), new Vector2(410f, 72f));
+            overlay.EnqueueOnce("pickup_first", "07_pickup_discovery", "A quiet glow lingers.", new Vector2(660f, 440f), new Vector2(0f, 136f), new Vector2(110f, -132f), new Vector2(470f, 58f));
         }
 
         public static void ShowCheckpoint()
         {
             InGameOverlayUI overlay = EnsureInstance();
-            overlay.EnqueuePopup("06_checkpoint", "A memory settles.", new Vector2(720f, 360f), new Vector2(0f, 160f), new Vector2(98f, -110f), new Vector2(460f, 64f), 2.1f);
+            overlay.EnqueuePopup("06_checkpoint", "A memory settles.", new Vector2(720f, 360f), new Vector2(0f, 160f), new Vector2(148f, -18f), new Vector2(480f, 76f), 2.1f);
             overlay.ShowSaveBadge();
         }
 
         public static void ShowEnemyEncounter()
         {
-            EnsureInstance().EnqueuePopup("10_enemy_banner", "The grove tightens.", new Vector2(760f, 380f), new Vector2(0f, 124f), new Vector2(96f, -110f), new Vector2(470f, 64f), 2.2f);
+            EnsureInstance().EnqueuePopup("10_enemy_banner", "The grove tightens.", new Vector2(760f, 380f), new Vector2(0f, 124f), new Vector2(104f, -4f), new Vector2(520f, 70f), 2.2f);
         }
 
         public static void ShowBarrierHint()
@@ -113,7 +113,7 @@ namespace Heartwell.UI
                 return;
 
             overlay.nextBarrierHintTime = Time.unscaledTime + 14f;
-            overlay.EnqueueOnce("barrier_" + SceneManager.GetActiveScene().name, "11_barrier_prompt", "Roots listen.", new Vector2(640f, 352f), new Vector2(0f, 122f), new Vector2(70f, -100f), new Vector2(420f, 62f));
+            overlay.EnqueueOnce("barrier_" + SceneManager.GetActiveScene().name, "11_barrier_prompt", "Roots listen.", new Vector2(640f, 352f), new Vector2(0f, 122f), new Vector2(82f, -98f), new Vector2(420f, 56f));
         }
 
         public static void ShowContextHint()
@@ -123,7 +123,7 @@ namespace Heartwell.UI
                 return;
 
             overlay.nextContextHintTime = Time.unscaledTime + 20f;
-            overlay.EnqueuePopup("04_context_prompt", "The echo is quiet.", new Vector2(560f, 373f), new Vector2(0f, 118f), new Vector2(0f, -42f), new Vector2(320f, 58f), 1.8f);
+            overlay.EnqueuePopup("04_context_prompt", "The echo is quiet.", new Vector2(560f, 373f), new Vector2(0f, 118f), new Vector2(0f, -24f), new Vector2(360f, 54f), 1.8f);
         }
 
         public static void ShowHazard(float health01)
@@ -277,6 +277,8 @@ namespace Heartwell.UI
             saveImage.preserveAspect = true;
 
             saveText = CreateText("Text", saveRect, 24, TextAnchor.MiddleLeft);
+            saveText.resizeTextMinSize = 10;
+            saveText.resizeTextMaxSize = 20;
             saveText.text = "Remembered";
             RectTransform textRect = saveText.rectTransform;
             textRect.anchorMin = Vector2.zero;
@@ -321,8 +323,8 @@ namespace Heartwell.UI
             sceneTitleRect.anchorMin = new Vector2(0.5f, 1f);
             sceneTitleRect.anchorMax = new Vector2(0.5f, 1f);
             sceneTitleRect.pivot = new Vector2(0.5f, 1f);
-            sceneTitleRect.anchoredPosition = new Vector2(0f, -74f);
-            sceneTitleRect.sizeDelta = new Vector2(900f, 206f);
+            sceneTitleRect.anchoredPosition = new Vector2(0f, -48f);
+            sceneTitleRect.sizeDelta = new Vector2(1180f, 270f);
 
             sceneTitleImage = titleObject.AddComponent<Image>();
             sceneTitleImage.color = Color.white;
@@ -352,6 +354,8 @@ namespace Heartwell.UI
             respawnImage.preserveAspect = true;
 
             respawnText = CreateText("Text", respawnRect, 30, TextAnchor.MiddleCenter);
+            respawnText.resizeTextMinSize = 12;
+            respawnText.resizeTextMaxSize = 24;
             respawnText.text = "The light gathers you.";
             RectTransform textRect = respawnText.rectTransform;
             textRect.anchorMin = Vector2.zero;
@@ -382,6 +386,8 @@ namespace Heartwell.UI
             optionsImage.preserveAspect = true;
 
             optionsText = CreateText("Title", optionsRect, 34, TextAnchor.MiddleCenter);
+            optionsText.resizeTextMinSize = 14;
+            optionsText.resizeTextMaxSize = 30;
             optionsText.text = "Options";
             RectTransform textRect = optionsText.rectTransform;
             textRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -432,11 +438,7 @@ namespace Heartwell.UI
                 popupRect.anchoredPosition = request.Position;
                 popupText.text = request.Message;
                 popupText.enabled = !string.IsNullOrWhiteSpace(request.Message);
-                popupTextRect.anchorMin = new Vector2(0.5f, 0.5f);
-                popupTextRect.anchorMax = new Vector2(0.5f, 0.5f);
-                popupTextRect.pivot = new Vector2(0.5f, 0.5f);
-                popupTextRect.anchoredPosition = request.TextPosition;
-                popupTextRect.sizeDelta = request.TextSize;
+                ApplyPopupTextLayout(request);
 
                 yield return FadeGroup(popupGroup, 1f, 0.22f);
                 yield return new WaitForSecondsRealtime(Mathf.Max(0.15f, request.HoldSeconds));
@@ -519,9 +521,9 @@ namespace Heartwell.UI
             if (delay > 0f)
                 yield return new WaitForSecondsRealtime(delay);
 
-            yield return FadeGroup(sceneTitleGroup, 1f, 0.45f);
-            yield return new WaitForSecondsRealtime(2.25f);
-            yield return FadeGroup(sceneTitleGroup, 0f, 0.7f);
+            yield return FadeGroup(sceneTitleGroup, 1f, 0.32f);
+            yield return new WaitForSecondsRealtime(3f);
+            yield return FadeGroup(sceneTitleGroup, 0f, 0.8f);
             sceneTitleRoutine = null;
         }
 
@@ -624,7 +626,7 @@ namespace Heartwell.UI
             text.font = serifFont;
             text.fontSize = fontSize;
             text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = Mathf.Max(12, fontSize - 12);
+            text.resizeTextMinSize = Mathf.Max(10, fontSize - 16);
             text.resizeTextMaxSize = fontSize;
             text.alignment = alignment;
             text.color = new Color(0.92f, 0.80f, 0.48f, 1f);
@@ -632,7 +634,55 @@ namespace Heartwell.UI
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
             text.supportRichText = false;
+            text.lineSpacing = 0.92f;
+            text.alignByGeometry = true;
             return text;
+        }
+
+        private void ApplyPopupTextLayout(PopupRequest request)
+        {
+            popupTextRect.anchorMin = new Vector2(0.5f, 0.5f);
+            popupTextRect.anchorMax = new Vector2(0.5f, 0.5f);
+            popupTextRect.pivot = new Vector2(0.5f, 0.5f);
+            popupTextRect.anchoredPosition = request.TextPosition;
+            popupTextRect.sizeDelta = request.TextSize;
+
+            int maxSize = ResolvePopupTextMaxSize(request.AssetName, request.Message);
+            popupText.fontSize = maxSize;
+            popupText.resizeTextMaxSize = maxSize;
+            popupText.resizeTextMinSize = 10;
+            popupText.alignment = TextAnchor.MiddleCenter;
+            popupText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            popupText.verticalOverflow = VerticalWrapMode.Truncate;
+        }
+
+        private static int ResolvePopupTextMaxSize(string assetName, string message)
+        {
+            int maxSize;
+            switch (assetName)
+            {
+                case "01_sticky_unlock":
+                case "02_wave_unlock":
+                    maxSize = 24;
+                    break;
+                case "06_checkpoint":
+                case "10_enemy_banner":
+                    maxSize = 26;
+                    break;
+                case "07_pickup_discovery":
+                case "11_barrier_prompt":
+                case "04_context_prompt":
+                    maxSize = 23;
+                    break;
+                default:
+                    maxSize = 24;
+                    break;
+            }
+
+            if (!string.IsNullOrEmpty(message) && message.Length > 24)
+                maxSize = Mathf.Min(maxSize, 21);
+
+            return maxSize;
         }
 
         private static GameObject CreateChild(string name, Transform parent)

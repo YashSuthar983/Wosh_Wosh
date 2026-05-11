@@ -6168,7 +6168,7 @@ MonoBehaviour:
   - {fileID: 1353981653}
   - {fileID: 2104000008}
   targetCamera: {fileID: 1928569212}
-  priorityBoost: 20
+  priorityBoost: 0
   playerLayerMask:
     serializedVersion: 2
     m_Bits: 1
@@ -6202,6 +6202,7 @@ MonoBehaviour:
   scanPlayerInsideTrigger: 1
   triggerScanInterval: 0.05
   triggerScanPadding: 0.75
+  useClearViewCamera: 0
   clearViewCamera: {fileID: 0}
   clearViewCameraName: Enemy Arena Clear View Camera
   clearViewCameraPosition: {x: 15, y: 22, z: 23}
